@@ -1,0 +1,14 @@
+name: "plan_critique_generator"
+description: "Generates independent critical reports on implementation plan consistency"
+llm: "openai_gpt4"
+tools:
+  - name: "file_reader"
+    description: "Read context files for critique analysis"
+    _type: "file_reader"
+    base_path: "./context"
+memory:
+  _type: "buffer"
+  max_token_limit: 2000
+agent_type: "zero-shot-react-description"
+max_iterations: 2
+early_stopping_method: "generate"

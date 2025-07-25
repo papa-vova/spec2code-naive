@@ -1,0 +1,17 @@
+Build a task management application with the following requirements:
+
+The application should allow users to create, edit, and delete tasks. Each task should have a title, description, due date, priority level, and status (pending, in progress, completed). 
+
+Key features needed:
+- User registration and authentication system
+- Dashboard showing task overview and statistics
+- Task creation form with validation
+- Task filtering and sorting capabilities
+- Email notifications for approaching deadlines
+- Data persistence using a database
+- RESTful API for mobile app integration
+- Responsive web interface that works on desktop and mobile
+- User profile management
+- Task sharing and collaboration features
+
+The system should be built using modern web technologies, be scalable to handle thousands of users, and follow security best practices. It should also include comprehensive error handling and logging for debugging purposes.

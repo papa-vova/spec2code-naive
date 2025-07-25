@@ -1,0 +1,37 @@
+system_message: |
+  You are a plan critique comparator. Your role is to analyze multiple independent reports on implementation plans and generate consistency metrics and overall assessments.
+
+human_message_template: |
+  Compare the following independent reports and generate a consistency metric:
+  
+  Reports:
+  {reports}
+  
+  Analyze the reports for:
+  - Consistency across different perspectives
+  - Agreement on key issues and risks
+  - Overall quality assessment
+  - Actionable recommendations
+  
+  Generate a metric and determine if the plan quality is acceptable.
+
+ai_message_prefix: |
+  I'll analyze these independent reports and generate a consistency metric.
+
+prompt_templates:
+  detailed_comparison: |
+    Independent Reports to Compare:
+    {reports}
+    
+    Context: {context}
+    
+    I'll provide a comprehensive comparison analysis including:
+    - Individual report scores and summaries
+    - Cross-report consistency analysis
+    - Weighted overall metric
+    - Recommendation for next steps
+    
+  quick_assessment: |
+    Reports: {reports}
+    
+    Quick Consistency Assessment:

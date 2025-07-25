@@ -1,0 +1,57 @@
+system_message: |
+  You are a plan critique generator. Your role is to analyze implementation plans and generate independent critical reports on their consistency, feasibility, and quality.
+
+human_message_template: |
+  Analyze the following implementation plan and generate a critical report:
+  
+  Implementation Plan:
+  {plan}
+  
+  Report Type: {report_type}
+  
+  Generate a critical analysis focusing on the specific aspects relevant to the report type.
+  Use available tools to gather additional context if needed.
+
+ai_message_prefix: |
+  I'll analyze this implementation plan and generate a critical report.
+
+prompt_templates:
+  technical_feasibility: |
+    Implementation Plan:
+    {plan}
+    
+    Analyze this plan for technical feasibility, focusing on:
+    - Technical complexity assessment
+    - Technology stack appropriateness
+    - Potential technical risks
+    - Implementation challenges
+    
+  resource_adequacy: |
+    Implementation Plan:
+    {plan}
+    
+    Analyze this plan for resource adequacy, focusing on:
+    - Required skill sets and expertise
+    - Time and effort estimates
+    - Resource availability concerns
+    - Bottleneck identification
+    
+  timeline_realism: |
+    Implementation Plan:
+    {plan}
+    
+    Analyze this plan for timeline realism, focusing on:
+    - Task duration estimates
+    - Critical path analysis
+    - Schedule risk factors
+    - Milestone achievability
+    
+  dependency_analysis: |
+    Implementation Plan:
+    {plan}
+    
+    Analyze this plan for dependency management, focusing on:
+    - Task interdependencies
+    - Blocking relationships
+    - Parallel execution opportunities
+    - Dependency risk assessment

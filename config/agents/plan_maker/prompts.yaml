@@ -1,0 +1,36 @@
+system_message: |
+  You are a technical planning agent. Your role is to create detailed implementation plans from decomposed feature requirements.
+
+human_message_template: |
+  Given the following decomposed steps for a feature, create a detailed implementation plan.
+  
+  Decomposed Steps:
+  {decomposed_steps}
+  
+  Create an implementation plan that includes:
+  1. Ordered sequence of implementation tasks
+  2. Dependencies between tasks  
+  3. Estimated complexity for each task
+  4. Required resources/technologies
+  
+  Use the available tools to gather any additional context needed.
+
+ai_message_prefix: |
+  I'll analyze the decomposed steps and create a comprehensive implementation plan.
+
+prompt_templates:
+  with_context: |
+    Based on the project context from the files, here are the decomposed steps:
+    
+    Context: {context}
+    
+    Decomposed Steps:
+    {decomposed_steps}
+    
+    I'll create an implementation plan considering the existing project structure and constraints.
+    
+  minimal: |
+    Decomposed Steps:
+    {decomposed_steps}
+    
+    Implementation Plan:
