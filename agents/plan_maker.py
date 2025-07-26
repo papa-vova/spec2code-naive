@@ -7,6 +7,7 @@ from langchain.agents import AgentExecutor, create_react_agent
 from langchain.prompts import PromptTemplate
 from langchain.tools import BaseTool
 from langchain_core.language_models.base import BaseLanguageModel
+from exceptions import PlanGenerationError, LLMError
 
 
 class PlanMakerTool(BaseTool):
@@ -15,10 +16,18 @@ class PlanMakerTool(BaseTool):
     description: str = "Creates detailed implementation plans from decomposed steps"
     
     def _run(self, decomposed_steps: str) -> str:
-        """Create implementation plan from steps."""
-        steps_list = decomposed_steps.split('\n')
+        """Create implementation plan from steps.
         
-        plan = f"""
+        Raises:
+            PlanGenerationError: If plan generation fails
+        """
+        try:
+            if not decomposed_steps or not decomposed_steps.strip():
+                raise PlanGenerationError("Empty or invalid input provided for plan generation")
+            
+            steps_list = decomposed_steps.split('\n')
+            
+            plan = f"""
 IMPLEMENTATION PLAN
 ===================
 
@@ -35,7 +44,11 @@ Dependencies: Sequential execution required
 Complexity: Medium
 Resources: Python, relevant libraries
 """
-        return plan.strip()
+            return plan.strip()
+        except Exception as e:
+            if isinstance(e, PlanGenerationError):
+                raise
+            raise PlanGenerationError(f"Failed to generate implementation plan: {str(e)}")
 
 
 class PlanMakerAgent:
@@ -74,15 +87,42 @@ Implementation Plan:
             
         Returns:
             Implementation plan as string
+            
+        Raises:
+            PlanGenerationError: If plan creation fails
+            LLMError: If LLM operations fail
         """
-        # Use the description directly instead of treating it as a list
-        description_text = input_description
-        
-        if self.llm:
-            # Use LangChain LLM if available
-            formatted_prompt = self.prompt.format(decomposed_steps=description_text)
-            response = self.llm.invoke(formatted_prompt)
-            return response.content if hasattr(response, 'content') else str(response)
-        else:
-            # Fallback to tool-based implementation for skeleton
-            return self.tool._run(description_text)
+        try:
+            if not input_description or not input_description.strip():
+                raise PlanGenerationError("Empty or invalid input description provided")
+            
+            # Use the description directly instead of treating it as a list
+            description_text = input_description
+            
+            if self.llm:
+                # Use LangChain LLM if available
+                try:
+                    formatted_prompt = self.prompt.format(decomposed_steps=description_text)
+                    response = self.llm.invoke(formatted_prompt)
+                    
+                    if not response:
+                        raise LLMError("LLM returned empty response")
+                    
+                    result = response.content if hasattr(response, 'content') else str(response)
+                    
+                    if not result or not result.strip():
+                        raise LLMError("LLM returned empty or invalid plan")
+                    
+                    return result
+                except Exception as e:
+                    if isinstance(e, (PlanGenerationError, LLMError)):
+                        raise
+                    raise LLMError(f"LLM operation failed: {str(e)}")
+            else:
+                # Fallback to tool-based implementation for skeleton
+                return self.tool._run(description_text)
+                
+        except (PlanGenerationError, LLMError):
+            raise
+        except Exception as e:
+            raise PlanGenerationError(f"Unexpected error in plan creation: {str(e)}")
