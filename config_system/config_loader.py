@@ -162,6 +162,8 @@ class ConfigLoader:
         except ValidationError as e:
             raise ConfigValidationError(f"Invalid prompts config in {prompts_path}: {e}")
     
+
+    
     def create_chat_prompt_template(self, agent_name: str, template_name: str = "default") -> ChatPromptTemplate:
         """Create LangChain ChatPromptTemplate from configuration."""
         prompts_config = self.load_prompts_config(agent_name)
@@ -218,6 +220,8 @@ class ConfigLoader:
             raise
         except Exception as e:
             raise ConfigValidationError(f"Unexpected error during validation: {e}")
+    
+
 
 
 def validate_config(config_root: str = "./config") -> bool:

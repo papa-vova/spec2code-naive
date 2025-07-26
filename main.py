@@ -7,9 +7,8 @@ import sys
 import argparse
 import time
 from typing import List, Dict, Any
-from agents.plan_maker import PlanMakerAgent
-from agents.plan_critique_generator import create_report_generators
-from agents.plan_critique_comparator import MetricComparatorAgent
+from config_system.config_loader import ConfigLoader, ConfigValidationError
+from config_system.agent_factory import AgentFactory
 from exceptions import (
     PipelineError, InputError, FileNotFoundError, EmptyFileError,
     PlanGenerationError, ReportGenerationError, MetricComparisonError
@@ -18,16 +17,45 @@ from logging_config import setup_pipeline_logging, log_step_start, log_step_comp
 
 
 class Pipeline:
-    """Main pipeline implementation."""
+    """Main pipeline for processing requirements and generating plans."""
     
-    def __init__(self, n_reports: int = 4, config_root: str = "./config", dry_run: bool = False):
-        # Configure agents based on mode
+    def __init__(self, config_root: str = "./config", dry_run: bool = False):
+        """Initialize pipeline with config-driven agent creation."""
         self.config_root = config_root
         self.dry_run = dry_run
-        self.plan_maker = PlanMakerAgent(dry_run=dry_run)
-        self.report_generators = create_report_generators(n=n_reports, dry_run=dry_run)
-        self.metric_comparator = MetricComparatorAgent()
-        self.n_reports = n_reports
+        
+        # Initialize config loader and agent factory
+        self.config_loader = ConfigLoader(config_root)
+        self.agent_factory = AgentFactory(self.config_loader)
+        
+        # Declarative list of required agents
+        required_agents = [
+            "plan_maker",
+            "plan_critique_generator", 
+            "plan_critique_comparator"
+        ]
+        
+        # Create all agents from the list
+        try:
+            self.agents = self.agent_factory.create_agents(required_agents, dry_run)
+            
+            # Access agents cleanly
+            self.plan_maker = self.agents['plan_maker']
+            self.report_generator = self.agents['plan_critique_generator']  # Single instance for now
+            self.comparator = self.agents['plan_critique_comparator']
+            
+        except ConfigValidationError as e:
+            if dry_run:
+                logger.warning(f"Config validation failed in dry-run mode: {e}")
+                # In dry-run mode, we can still proceed with minimal setup
+                self.plan_maker = None
+                self.report_generator = None
+                self.comparator = None
+            else:
+                raise PipelineError(f"Failed to initialize agents: {e}")
+        
+        # Pipeline settings
+        self.n_reports = 1  # Single report generator for now
         self.logger = None
     
     def set_logger(self, logger):
@@ -76,33 +104,32 @@ class Pipeline:
                     log_error(self.logger, f"Plan generation failed: {str(e)}", "PlanMaker", e)
                 raise PlanGenerationError(f"Failed to create implementation plan: {str(e)}")
             
-            # Step: Produce N independent critical reports on the plan's consistency
+            # Step: Generate critical report on the plan's consistency
             reports_start_time = time.time()
             reports = []
             try:
                 if self.logger:
                     log_step_start(self.logger, "ReportGenerator", "report_generation", 
-                                 f"Generating {self.n_reports} independent reports")
+                                 "Generating critical report on plan")
                 
-                for i, generator in enumerate(self.report_generators):
-                    report_start_time = time.time()
-                    
-                    if self.logger:
-                        log_debug(self.logger, f"Generating report {i+1}/{self.n_reports}", "ReportGenerator", {
-                            "report_number": i+1,
-                            "report_type": generator.report_type.value
+                # Generate single report for now
+                report_start_time = time.time()
+                
+                if self.logger:
+                    log_debug(self.logger, "Generating critical report", "ReportGenerator", {
+                            "report_type": self.report_generator.report_type.value
                         })
                     
-                    report = generator.generate_report(implementation_plan)
-                    reports.append(report)
-                    
-                    report_duration = (time.time() - report_start_time) * 1000
-                    if self.logger:
-                        log_debug(self.logger, f"Report {i+1} completed", "ReportGenerator", {
-                            "score": report['score'],
-                            "type": report['type'],
-                            "duration_ms": report_duration
-                        })
+                report = self.report_generator.generate_report(implementation_plan)
+                reports.append(report)
+                
+                report_duration = (time.time() - report_start_time) * 1000
+                if self.logger:
+                    log_debug(self.logger, "Report completed", "ReportGenerator", {
+                        "score": report['score'],
+                        "type": report['type'],
+                        "duration_ms": report_duration
+                    })
                         
                 reports_duration = (time.time() - reports_start_time) * 1000
                 if self.logger:
@@ -123,7 +150,7 @@ class Pipeline:
                     log_step_start(self.logger, "MetricComparator", "metric_comparison", 
                                  "Comparing reports and generating metric")
                 
-                comparison_result = self.metric_comparator.compare_reports(reports)
+                comparison_result = self.comparator.compare_reports(reports)
                 
                 comparison_duration = (time.time() - comparison_start_time) * 1000
                 if self.logger:
@@ -140,7 +167,7 @@ class Pipeline:
                 raise MetricComparisonError(f"Failed to compare reports: {str(e)}")
             
             # Check if metric is OK (decision point from flow)
-            metric_ok = self.metric_comparator.is_metric_ok(comparison_result)
+            metric_ok = self.comparator.is_metric_ok(comparison_result)
             
             # Log final decision
             if self.logger:
@@ -238,7 +265,7 @@ def main():
         })
         
         # Initialize and run pipeline
-        pipeline = Pipeline(n_reports=4, config_root=args.config_root, dry_run=args.dry_run)
+        pipeline = Pipeline(config_root=args.config_root, dry_run=args.dry_run)
         pipeline.set_logger(logger)
         
         # Log dry-run mode if active
