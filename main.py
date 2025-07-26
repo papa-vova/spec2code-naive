@@ -20,8 +20,9 @@ from logging_config import setup_pipeline_logging, log_step_start, log_step_comp
 class Pipeline:
     """Main pipeline implementation."""
     
-    def __init__(self, n_reports: int = 4):
+    def __init__(self, n_reports: int = 4, config_root: str = "./config"):
         # Skeleton implementation without LLM dependencies
+        self.config_root = config_root
         self.plan_maker = PlanMakerAgent()
         self.report_generators = create_report_generators(n=n_reports)
         self.metric_comparator = MetricComparatorAgent()
@@ -190,6 +191,11 @@ def main():
             action='store_true',
             help='Enable verbose logging (equivalent to --log-level DEBUG)'
         )
+        parser.add_argument(
+            '--config-root',
+            default='./config',
+            help='Path to configuration directory (default: ./config)'
+        )
         
         args = parser.parse_args()
         input_file = args.input
@@ -226,7 +232,7 @@ def main():
         })
         
         # Initialize and run pipeline
-        pipeline = Pipeline(n_reports=4)
+        pipeline = Pipeline(n_reports=4, config_root=args.config_root)
         pipeline.set_logger(logger)
         results = pipeline.run_pipeline(input_description)
         

@@ -11,6 +11,8 @@ spec2code-naive/
 ├── requirements.txt                  # Python dependencies
 ├── sample_input.txt                  # Sample input file for testing
 ├── cli_config.py                     # CLI configuration management tool
+├── exceptions.py                     # Custom exception classes for error handling
+├── logging_config.py                 # JSON logging configuration and utilities
 │
 ├── agents/                           # Core agent implementations
 │   ├── __init__.py                   # Package initialization
@@ -65,6 +67,14 @@ spec2code-naive/
 **`cli_config.py`**
 - CLI configuration utilities
 - Handles command-line argument processing and validation
+
+**`exceptions.py`**
+- Custom exception classes for error handling
+- Defines specific exceptions for pipeline errors, agent failures, and configuration issues
+
+**`logging_config.py`**
+- JSON logging configuration and utilities
+- Defines logging formats, levels, and handlers for the application
 
 ### Agent Implementations
 
@@ -130,76 +140,36 @@ spec2code-naive/
 ### Main Pipeline
 
 ```bash
-# Run the pipeline with an input file
-python main.py -i input_description.txt
+# Run the pipeline with an input file:
+python main.py -i sample_input.txt
 
-# Show help
+# With logging options
+python main.py -i sample_input.txt --log-level DEBUG
+python main.py -i sample_input.txt --verbose
+
+# With custom configuration directory
+python main.py -i sample_input.txt --config-root ./my-configs
+
+# Show help for all options
 python main.py --help
-
-# Example with custom input file
-python main.py -i my_project_description.txt
 ```
 
-### Configuration Management CLI
+### Configuration Management
 
-The `cli_config.py` tool provides configuration management commands:
-
-#### Available Commands
-
-**VALIDATE** - Validate all configuration files
+Use the configuration management CLI for setup and validation:
 ```bash
+# Validate all configurations
 python cli_config.py validate
-```
-- Validates all YAML configuration files for syntax and structure
-- Checks models, agents, and prompts for correctness
-- Returns success/failure with detailed error messages
 
-**LIST** - List available models and agents
-```bash
+# List available models and agents  
 python cli_config.py list
-```
-- Shows all available models from `config/models/`
-- Shows all available agents from `config/agents/`
-- Useful for seeing what's configured in your system
 
-**CHECK** - Check specific configuration
-```bash
-# Check a specific model
-python cli_config.py check --model openai_gpt4
-
-# Check a specific agent
+# Check specific configurations
 python cli_config.py check --agent plan_maker
 
-# Check both model and agent
-python cli_config.py check --model openai_gpt4 --agent plan_maker
-```
-- Validates and displays details for specific model or agent
-- Shows configuration parameters, tools, prompt templates
-- Helpful for debugging specific agent issues
-
-#### Global Options
-
-```bash
-# Use custom config directory
+# With custom configuration directory
 python cli_config.py --config-root ./my-configs validate
 
 # Show detailed help
 python cli_config.py --help
-python cli_config.py
-```
-
-#### Example Workflow
-
-```bash
-# 1. Validate all configurations before deployment
-python cli_config.py validate
-
-# 2. List available resources
-python cli_config.py list
-
-# 3. Check specific configurations during development
-python cli_config.py check --agent plan_maker
-
-# 4. Use with custom config directory
-python cli_config.py --config-root ./test-configs validate
 ```
