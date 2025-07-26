@@ -54,8 +54,9 @@ Resources: Python, relevant libraries
 class PlanMakerAgent:
     """LangChain agent responsible for creating implementation plans from decomposed steps."""
     
-    def __init__(self, llm: BaseLanguageModel = None):
+    def __init__(self, llm: BaseLanguageModel = None, dry_run: bool = False):
         self.llm = llm
+        self.dry_run = dry_run
         self.tool = PlanMakerTool()
         
         # Create prompt template for the agent
@@ -99,28 +100,31 @@ Implementation Plan:
             # Use the description directly instead of treating it as a list
             description_text = input_description
             
-            if self.llm:
-                # Use LangChain LLM if available
-                try:
-                    formatted_prompt = self.prompt.format(decomposed_steps=description_text)
-                    response = self.llm.invoke(formatted_prompt)
-                    
-                    if not response:
-                        raise LLMError("LLM returned empty response")
-                    
-                    result = response.content if hasattr(response, 'content') else str(response)
-                    
-                    if not result or not result.strip():
-                        raise LLMError("LLM returned empty or invalid plan")
-                    
-                    return result
-                except Exception as e:
-                    if isinstance(e, (PlanGenerationError, LLMError)):
-                        raise
-                    raise LLMError(f"LLM operation failed: {str(e)}")
-            else:
-                # Fallback to tool-based implementation for skeleton
+            if self.dry_run:
+                # Use tool-based implementation for dry-run mode
                 return self.tool._run(description_text)
+            
+            if not self.llm:
+                raise PlanGenerationError("No LLM configured - agent requires a language model to generate plans")
+            
+            # Use LangChain LLM to generate plan
+            try:
+                formatted_prompt = self.prompt.format(decomposed_steps=description_text)
+                response = self.llm.invoke(formatted_prompt)
+                
+                if not response:
+                    raise LLMError("LLM returned empty response")
+                
+                result = response.content if hasattr(response, 'content') else str(response)
+                
+                if not result or not result.strip():
+                    raise LLMError("LLM returned empty or invalid plan")
+                
+                return result
+            except Exception as e:
+                if isinstance(e, (PlanGenerationError, LLMError)):
+                    raise
+                raise LLMError(f"LLM operation failed: {str(e)}")
                 
         except (PlanGenerationError, LLMError):
             raise

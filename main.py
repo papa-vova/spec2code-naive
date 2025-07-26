@@ -20,11 +20,12 @@ from logging_config import setup_pipeline_logging, log_step_start, log_step_comp
 class Pipeline:
     """Main pipeline implementation."""
     
-    def __init__(self, n_reports: int = 4, config_root: str = "./config"):
-        # Skeleton implementation without LLM dependencies
+    def __init__(self, n_reports: int = 4, config_root: str = "./config", dry_run: bool = False):
+        # Configure agents based on mode
         self.config_root = config_root
-        self.plan_maker = PlanMakerAgent()
-        self.report_generators = create_report_generators(n=n_reports)
+        self.dry_run = dry_run
+        self.plan_maker = PlanMakerAgent(dry_run=dry_run)
+        self.report_generators = create_report_generators(n=n_reports, dry_run=dry_run)
         self.metric_comparator = MetricComparatorAgent()
         self.n_reports = n_reports
         self.logger = None
@@ -196,6 +197,11 @@ def main():
             default='./config',
             help='Path to configuration directory (default: ./config)'
         )
+        parser.add_argument(
+            '--dry-run',
+            action='store_true',
+            help='Run pipeline with dummy responses (no LLM required)'
+        )
         
         args = parser.parse_args()
         input_file = args.input
@@ -232,8 +238,15 @@ def main():
         })
         
         # Initialize and run pipeline
-        pipeline = Pipeline(n_reports=4, config_root=args.config_root)
+        pipeline = Pipeline(n_reports=4, config_root=args.config_root, dry_run=args.dry_run)
         pipeline.set_logger(logger)
+        
+        # Log dry-run mode if active
+        if args.dry_run:
+            logger.info("Running in DRY-RUN mode - using dummy responses (no LLM required)", extra={
+                "component": "Main",
+                "data": {"mode": "dry_run"}
+            })
         results = pipeline.run_pipeline(input_description)
         
         # TODO: Generate artifacts (files, reports, etc.) instead of console output

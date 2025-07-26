@@ -91,9 +91,10 @@ class PlanCritiqueTool(BaseTool):
 class ReportGeneratorAgent:
     """LangChain agent responsible for generating independent critical reports on plan consistency."""
     
-    def __init__(self, report_type: ReportType, llm: BaseLanguageModel = None):
+    def __init__(self, report_type: ReportType, llm: BaseLanguageModel = None, dry_run: bool = False):
         self.report_type = report_type
         self.llm = llm
+        self.dry_run = dry_run
         self.tool = PlanCritiqueTool(report_type)
         
         # Create specialized prompt based on report type
@@ -190,37 +191,40 @@ Dependency Analysis Report:
             if not plan or not plan.strip():
                 raise ReportGenerationError("Empty or invalid plan provided for analysis")
             
-            if self.llm:
-                # Use LangChain LLM if available
-                try:
-                    formatted_prompt = self.prompt.format(plan=plan)
-                    response = self.llm.invoke(formatted_prompt)
-                    
-                    if not response:
-                        raise LLMError("LLM returned empty response for report generation")
-                    
-                    # Parse LLM response into structured format
-                    # For now, return structured mock data with LLM analysis
-                    llm_analysis = response.content if hasattr(response, 'content') else str(response)
-                    
-                    if not llm_analysis or not llm_analysis.strip():
-                        raise LLMError("LLM returned empty analysis")
-                    
-                    return {
-                        "type": self.report_type.value.replace('_', ' ').title(),
-                        "score": 7.0,  # Could be extracted from LLM response
-                        "summary": llm_analysis[:100] + "...",
-                        "concerns": ["LLM-identified concern 1", "LLM-identified concern 2"],
-                        "recommendations": ["LLM recommendation 1", "LLM recommendation 2"],
-                        "full_analysis": llm_analysis
-                    }
-                except Exception as e:
-                    if isinstance(e, (ReportGenerationError, LLMError)):
-                        raise
-                    raise LLMError(f"LLM operation failed during report generation: {str(e)}")
-            else:
-                # Fallback to tool-based implementation for skeleton
+            if self.dry_run:
+                # Use tool-based implementation for dry-run mode
                 return self.tool._run(plan)
+            
+            if not self.llm:
+                raise ReportGenerationError("No LLM configured - agent requires a language model to generate reports")
+            
+            # Use LangChain LLM to generate report
+            try:
+                formatted_prompt = self.prompt.format(plan=plan)
+                response = self.llm.invoke(formatted_prompt)
+                
+                if not response:
+                    raise LLMError("LLM returned empty response for report generation")
+                
+                # Parse LLM response into structured format
+                # For now, return structured mock data with LLM analysis
+                llm_analysis = response.content if hasattr(response, 'content') else str(response)
+                
+                if not llm_analysis or not llm_analysis.strip():
+                    raise LLMError("LLM returned empty analysis")
+                
+                return {
+                    "type": self.report_type.value.replace('_', ' ').title(),
+                    "score": 7.0,  # Could be extracted from LLM response
+                    "summary": llm_analysis[:100] + "...",
+                    "concerns": ["LLM-identified concern 1", "LLM-identified concern 2"],
+                    "recommendations": ["LLM recommendation 1", "LLM recommendation 2"],
+                    "full_analysis": llm_analysis
+                }
+            except Exception as e:
+                if isinstance(e, (ReportGenerationError, LLMError)):
+                    raise
+                raise LLMError(f"LLM operation failed during report generation: {str(e)}")
                 
         except (ReportGenerationError, LLMError):
             raise
@@ -228,12 +232,13 @@ Dependency Analysis Report:
             raise ReportGenerationError(f"Unexpected error in report generation: {str(e)}")
 
 
-def create_report_generators(n: int = 4) -> List[ReportGeneratorAgent]:
+def create_report_generators(n: int = 4, dry_run: bool = False) -> List[ReportGeneratorAgent]:
     """
     Create N independent report generator agents.
     
     Args:
         n: Number of report generators to create
+        dry_run: Whether to create agents in dry-run mode
         
     Returns:
         List of ReportGeneratorAgent instances
@@ -254,7 +259,7 @@ def create_report_generators(n: int = 4) -> List[ReportGeneratorAgent]:
         for i in range(n):
             try:
                 report_type = report_types[i % len(report_types)]
-                generator = ReportGeneratorAgent(report_type)
+                generator = ReportGeneratorAgent(report_type, dry_run=dry_run)
                 generators.append(generator)
             except Exception as e:
                 raise ReportGenerationError(f"Failed to create report generator {i+1}: {str(e)}")

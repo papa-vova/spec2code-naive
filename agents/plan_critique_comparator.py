@@ -32,12 +32,7 @@ class MetricComparatorAgent:
         """
         try:
             if not reports:
-                return {
-                    "metric": 0.0,
-                    "status": "FAIL",
-                    "reason": "No reports provided",
-                    "details": {}
-                }
+                raise MetricComparisonError("No reports provided for comparison - agent requires valid report data")
             
             # Validate reports structure
             for i, report in enumerate(reports):
