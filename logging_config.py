@@ -6,9 +6,22 @@ import json
 import logging
 import sys
 import uuid
+import traceback
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
+from dataclasses import dataclass
 import os
+
+
+@dataclass
+class LogPayload:
+    """Structured log payload for consistent logging."""
+    component: Optional[str] = None
+    step: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+    duration_ms: Optional[float] = None
+    exception: Optional[str] = None
+    traceback: Optional[str] = None
 
 
 class JSONFormatter(logging.Formatter):
@@ -56,11 +69,20 @@ class JSONFormatter(logging.Formatter):
 
 
 class PipelineLogger:
-    """Factory class for creating configured loggers."""
+    """Singleton factory class for creating configured loggers."""
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls, execution_id: str = None):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
     
     def __init__(self, execution_id: str = None):
-        self.execution_id = execution_id or str(uuid.uuid4())[:8]
-        self._configured = False
+        if not self._initialized:
+            self.execution_id = execution_id or str(uuid.uuid4())[:8]
+            self._configured = False
+            PipelineLogger._initialized = True
     
     def configure_logging(self, log_level: str = "INFO") -> None:
         """Configure the root logger with JSON formatting to stderr."""
@@ -95,27 +117,44 @@ class PipelineLogger:
         """Get a logger with the specified name."""
         return logging.getLogger(name)
     
-    def log_with_context(self, logger: logging.Logger, level: str, message: str, 
-                        component: str = None, step: str = None, 
-                        data: Dict[str, Any] = None, duration_ms: float = None) -> None:
-        """Log a message with additional context."""
-        # Get the logging level
-        numeric_level = getattr(logging, level.upper(), logging.INFO)
+    def log_with_context(self, logger: logging.Logger, level: Union[int, str], message: str, 
+                        payload: LogPayload = None, **kwargs) -> None:
+        """Log a message with additional context using structured payload."""
+        # Handle both string and int levels for backwards compatibility
+        if isinstance(level, str):
+            numeric_level = getattr(logging, level.upper(), logging.INFO)
+        else:
+            numeric_level = level
+        
+        # Create payload from kwargs if not provided
+        if payload is None:
+            payload = LogPayload(
+                component=kwargs.get('component'),
+                step=kwargs.get('step'),
+                data=kwargs.get('data'),
+                duration_ms=kwargs.get('duration_ms'),
+                exception=kwargs.get('exception'),
+                traceback=kwargs.get('traceback')
+            )
         
         # Create a custom log record
         record = logger.makeRecord(
             logger.name, numeric_level, "", 0, message, (), None
         )
         
-        # Add custom attributes
-        if component:
-            record.component = component
-        if step:
-            record.step = step
-        if data:
-            record.data = data
-        if duration_ms is not None:
-            record.duration_ms = duration_ms
+        # Add custom attributes from payload
+        if payload.component:
+            record.component = payload.component
+        if payload.step:
+            record.step = payload.step
+        if payload.data:
+            record.data = payload.data
+        if payload.duration_ms is not None:
+            record.duration_ms = payload.duration_ms
+        if payload.exception:
+            record.exception = payload.exception
+        if payload.traceback:
+            record.traceback = payload.traceback
         
         # Log the record
         logger.handle(record)
@@ -167,42 +206,52 @@ def setup_pipeline_logging(log_level: str = None, verbose: bool = False,
     return pipeline_logger
 
 
+# Global singleton instance
+_pipeline_logger = PipelineLogger()
+
+
 # Convenience functions for common logging patterns
 def log_step_start(logger: logging.Logger, component: str, step: str, message: str, 
                   data: Dict[str, Any] = None) -> None:
     """Log the start of a pipeline step."""
-    pipeline_logger = PipelineLogger()
-    pipeline_logger.log_with_context(
-        logger, "INFO", message, component=component, step=step, data=data
+    _pipeline_logger.log_with_context(
+        logger, logging.INFO, message, 
+        component=component, step=step, data=data
     )
 
 
 def log_step_complete(logger: logging.Logger, component: str, step: str, message: str,
                      data: Dict[str, Any] = None, duration_ms: float = None) -> None:
     """Log the completion of a pipeline step."""
-    pipeline_logger = PipelineLogger()
-    pipeline_logger.log_with_context(
-        logger, "INFO", message, component=component, step=step, 
-        data=data, duration_ms=duration_ms
+    _pipeline_logger.log_with_context(
+        logger, logging.INFO, message, 
+        component=component, step=step, data=data, duration_ms=duration_ms
     )
 
 
 def log_debug(logger: logging.Logger, message: str, component: str = None, 
              data: Dict[str, Any] = None) -> None:
     """Log a debug message with optional context."""
-    pipeline_logger = PipelineLogger()
-    pipeline_logger.log_with_context(
-        logger, "DEBUG", message, component=component, data=data
+    _pipeline_logger.log_with_context(
+        logger, logging.DEBUG, message, 
+        component=component, data=data
     )
 
 
 def log_error(logger: logging.Logger, message: str, component: str = None, 
              error: Exception = None) -> None:
     """Log an error message with optional exception info."""
+    # Always use the same logging backend for consistency
+    error_data = {}
     if error:
-        logger.error(message, exc_info=True, extra={"component": component})
-    else:
-        pipeline_logger = PipelineLogger()
-        pipeline_logger.log_with_context(
-            logger, "ERROR", message, component=component
-        )
+        error_data = {
+            "exception": str(error),
+            "traceback": traceback.format_exc()
+        }
+    
+    _pipeline_logger.log_with_context(
+        logger, logging.ERROR, message, 
+        component=component, 
+        exception=str(error) if error else None,
+        traceback=traceback.format_exc() if error else None
+    )
