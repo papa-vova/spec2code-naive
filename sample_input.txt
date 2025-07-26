@@ -1,0 +1,34 @@
+Build a task management application with the following requirements:
+
+The application should allow users to:
+1. Create, read, update, and delete tasks
+2. Organize tasks into projects or categories
+3. Set due dates and priorities for tasks
+4. Mark tasks as complete or incomplete
+5. Search and filter tasks by various criteria
+6. Assign tasks to team members (if multi-user)
+7. Add comments or notes to tasks
+8. Track time spent on tasks
+9. Generate reports on task completion and productivity
+10. Receive notifications for upcoming deadlines
+
+Technical requirements:
+- Web-based application accessible via browser
+- Responsive design for mobile and desktop
+- User authentication and authorization
+- Data persistence with a database
+- RESTful API for frontend-backend communication
+- Real-time updates for collaborative features
+- Export functionality (PDF, CSV)
+- Integration with calendar applications
+- Search functionality with full-text search capabilities
+- Audit trail for task changes
+
+Non-functional requirements:
+- Support for up to 1000 concurrent users
+- Response time under 2 seconds for most operations
+- 99.9% uptime availability
+- GDPR compliance for data protection
+- Scalable architecture to handle growth
+- Automated testing coverage of at least 80%
+- Comprehensive documentation for users and developers

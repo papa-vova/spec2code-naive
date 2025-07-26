@@ -202,9 +202,6 @@ langchain.log
 *.langchain
 
 # Input/output files that might contain sensitive data
-input_description.txt
-sample_input_description.txt
-test_input_*.txt
 output_*.txt
 results_*.json
 
