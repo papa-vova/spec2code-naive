@@ -3,128 +3,69 @@ Agent factory for creating agent instances from configuration.
 Separates config loading from agent instantiation.
 """
 import importlib
+import os
 from typing import Dict, Any, Optional
 from langchain_core.language_models.base import BaseLanguageModel
 
 from config_system.config_loader import ConfigLoader, ConfigValidationError, ModelConfig, AgentConfig
+from core.agent import Agent
 
 
 class ModelRegistry:
-    """Registry for dynamic model provider imports."""
-    
-    _providers = {
-        "openai-chat": {
-            "import_path": "langchain_openai",
-            "class_name": "ChatOpenAI"
-        },
-        # Add more providers as needed
-        # "anthropic-chat": {
-        #     "import_path": "langchain_anthropic", 
-        #     "class_name": "ChatAnthropic"
-        # },
-        # "ollama-chat": {
-        #     "import_path": "langchain_ollama",
-        #     "class_name": "ChatOllama"
-        # }
-    }
+    """Fully dynamic registry for any LangChain model provider."""
     
     @classmethod
     def create_llm(cls, model_config: ModelConfig) -> BaseLanguageModel:
-        """Create an LLM instance from model configuration."""
-        provider_info = cls._providers.get(model_config._type)
-        if not provider_info:
-            raise ConfigValidationError(f"Unsupported model type: {model_config._type}")
-        
+        """Create an LLM instance from model configuration using dynamic discovery."""
         try:
-            # Dynamic import
-            module = importlib.import_module(provider_info["import_path"])
-            llm_class = getattr(module, provider_info["class_name"])
+            # Dynamic import using naming convention: langchain_{provider}
+            module = importlib.import_module(f"langchain_{model_config.provider}")
             
-            # Create LLM instance based on type
-            if model_config._type == "openai-chat":
-                return cls._create_openai_llm(llm_class, model_config)
-            else:
-                raise ConfigValidationError(f"LLM creation not implemented for type: {model_config._type}")
+            # Dynamic class discovery using naming convention: Chat{Provider}
+            class_name = f"Chat{model_config.provider.title()}"
+            llm_class = getattr(module, class_name)
+            
+            # Create LLM instance with generic parameter handling
+            return cls._create_llm_instance(llm_class, model_config)
                 
         except ImportError as e:
-            provider_name = model_config._type.split("-")[0]
             raise ConfigValidationError(
-                f"Model provider '{model_config._type}' requires additional dependencies. "
-                f"Install with: pip install langchain-{provider_name}"
+                f"Model provider '{model_config.provider}' requires additional dependencies. "
+                f"Install with: pip install langchain-{model_config.provider}\n"
+                f"Error: {str(e)}"
+            )
+        except AttributeError as e:
+            raise ConfigValidationError(
+                f"Provider '{model_config.provider}' does not have expected class 'Chat{model_config.provider.title()}'. "
+                f"Error: {str(e)}"
             )
         except Exception as e:
             raise ConfigValidationError(f"Failed to create LLM {model_config.name}: {str(e)}")
     
     @classmethod
-    def _create_openai_llm(cls, llm_class, model_config: ModelConfig):
-        """Create OpenAI LLM with proper parameter handling."""
-        import os
+    def _create_llm_instance(cls, llm_class, model_config: ModelConfig):
+        """Create LLM instance with generic parameter and credential handling."""
+        # Start with model name
+        llm_params = {"model": model_config.model_name}
         
-        # Expand environment variables in API key
-        api_key = model_config.openai_api_key or ""
-        if api_key.startswith("${") and api_key.endswith("}"):
-            env_var = api_key[2:-1]
-            api_key = os.getenv(env_var)
-            if not api_key:
-                raise ConfigValidationError(f"Environment variable {env_var} not set for OpenAI API key")
+        # Add all generic parameters
+        llm_params.update(model_config.parameters)
         
-        return llm_class(
-            model=model_config.model_name or "gpt-4",
-            temperature=model_config.temperature,
-            max_tokens=model_config.max_tokens,
-            top_p=model_config.top_p,
-            api_key=api_key,
-            streaming=model_config.streaming
-        )
-
-
-class AgentRegistry:
-    """Registry for dynamic agent class imports."""
-    
-    _agents = {
-        "plan_maker": {
-            "import_path": "agents.plan_maker",
-            "class_name": "PlanMakerAgent"
-        },
-        "plan_critique_generator": {
-            "import_path": "agents.plan_critique_generator", 
-            "class_name": "ReportGeneratorAgent"
-        },
-        "plan_critique_comparator": {
-            "import_path": "agents.plan_critique_comparator",
-            "class_name": "MetricComparatorAgent"
-        }
-    }
-    
-    @classmethod
-    def create_agent(cls, agent_name: str, agent_config: AgentConfig, llm: Optional[BaseLanguageModel], dry_run: bool):
-        """Create an agent instance from configuration."""
-        agent_info = cls._agents.get(agent_name)
-        if not agent_info:
-            raise ConfigValidationError(f"Unknown agent type: {agent_name}")
-        
-        try:
-            # Dynamic import
-            module = importlib.import_module(agent_info["import_path"])
-            agent_class = getattr(module, agent_info["class_name"])
-            
-            # Create agent instance based on type
-            if agent_name == "plan_maker":
-                return agent_class(llm=llm, dry_run=dry_run)
-            elif agent_name == "plan_critique_generator":
-                # For now, create single instance - multi-instance logic deferred
-                from agents.plan_critique_generator import ReportType
-                return agent_class(report_type=ReportType.TECHNICAL_FEASIBILITY, llm=llm, dry_run=dry_run)
-            elif agent_name == "plan_critique_comparator":
-                # MetricComparatorAgent doesn't need LLM for now (will be LLM-based later)
-                return agent_class()
+        # Handle credentials with environment variable expansion
+        for cred_key, cred_value in model_config.credentials.items():
+            if cred_value.startswith("${") and cred_value.endswith("}"):
+                env_var = cred_value[2:-1]
+                expanded_value = os.getenv(env_var)
+                if not expanded_value:
+                    raise ConfigValidationError(f"Environment variable {env_var} not set for credential {cred_key}")
+                llm_params[cred_key] = expanded_value
             else:
-                raise ConfigValidationError(f"Agent instantiation not implemented for: {agent_name}")
-                
-        except ImportError as e:
-            raise ConfigValidationError(f"Failed to import agent {agent_name}: {str(e)}")
-        except Exception as e:
-            raise ConfigValidationError(f"Failed to create agent {agent_name}: {str(e)}")
+                llm_params[cred_key] = cred_value
+        
+        return llm_class(**llm_params)
+
+
+# AgentRegistry removed - we now use the unified Agent class directly
 
 
 class AgentFactory:
@@ -133,12 +74,12 @@ class AgentFactory:
     def __init__(self, config_loader: ConfigLoader):
         self.config_loader = config_loader
         self.model_registry = ModelRegistry()
-        self.agent_registry = AgentRegistry()
     
-    def create_agent(self, agent_name: str, dry_run: bool = False):
+    def create_agent(self, agent_name: str, dry_run: bool = False) -> Agent:
         """Create a single agent instance from configuration."""
-        # Load agent configuration
+        # Load agent and prompts configuration
         agent_config = self.config_loader.load_agent_config(agent_name)
+        prompts_config = self.config_loader.load_prompts_config(agent_name)
         
         # Create LLM if not in dry-run mode
         llm = None
@@ -146,8 +87,13 @@ class AgentFactory:
             model_config = self.config_loader.load_model_config(agent_config.llm)
             llm = self.model_registry.create_llm(model_config)
         
-        # Create the agent
-        return self.agent_registry.create_agent(agent_name, agent_config, llm, dry_run)
+        # Create the agent using the new Agent class
+        return Agent(
+            config=agent_config,
+            prompts=prompts_config,
+            llm=llm,
+            dry_run=dry_run
+        )
     
     def create_agents(self, required_agents: list, dry_run: bool = False) -> Dict[str, Any]:
         """Create multiple agents from a list of required agent names."""

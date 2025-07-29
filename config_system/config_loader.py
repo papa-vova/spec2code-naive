@@ -12,15 +12,12 @@ from langchain.prompts import PromptTemplate, ChatPromptTemplate, SystemMessageP
 
 
 class ModelConfig(BaseModel):
-    """Configuration for LangChain LLM models."""
+    """Configuration for LangChain LLM models - fully generic."""
     name: str
-    _type: str
-    model_name: Optional[str] = None
-    temperature: float = 0.7
-    max_tokens: int = 2000
-    top_p: float = 1.0
-    openai_api_key: Optional[str] = None
-    streaming: bool = False
+    provider: str  # e.g., "openai", "anthropic", "ollama"
+    model_name: str  # e.g., "gpt-4", "claude-3-sonnet", "llama2"
+    parameters: Dict[str, Any] = {}  # Generic parameters like temperature, max_tokens, etc.
+    credentials: Dict[str, str] = {}  # Generic credentials like api_key, etc.
 
 
 class ToolConfig(BaseModel):
@@ -55,6 +52,36 @@ class PromptsConfig(BaseModel):
     human_message_template: str
     ai_message_prefix: Optional[str] = None
     prompt_templates: Dict[str, str] = {}
+
+
+class PipelineAgentConfig(BaseModel):
+    """Configuration for a single agent in the pipeline."""
+    name: str
+    input_mapping: str
+    output_key: str
+    prompt_template: str = "default"
+
+
+class PipelineExecutionConfig(BaseModel):
+    """Configuration for pipeline execution settings."""
+    mode: str = "sequential"
+    template_selection: str = "specified"
+
+
+class PipelineSettingsConfig(BaseModel):
+    """Configuration for pipeline-level settings."""
+    dry_run_supported: bool = True
+    logging_enabled: bool = True
+    config_validation: bool = True
+
+
+class PipelineConfig(BaseModel):
+    """Configuration for the entire pipeline."""
+    name: str
+    description: str
+    agents: List[PipelineAgentConfig]
+    execution: PipelineExecutionConfig
+    settings: PipelineSettingsConfig
 
 
 class ConfigValidationError(Exception):
@@ -162,8 +189,30 @@ class ConfigLoader:
         except ValidationError as e:
             raise ConfigValidationError(f"Invalid prompts config in {prompts_path}: {e}")
     
+    def load_pipeline_config(self) -> PipelineConfig:
+        """Load and validate pipeline configuration."""
+        pipeline_path = self.config_root / "pipeline.yaml"
+        
+        if not pipeline_path.exists():
+            raise ConfigValidationError(f"Pipeline config not found: {pipeline_path}")
+            
+        try:
+            with open(pipeline_path, 'r') as f:
+                config_data = yaml.safe_load(f)
+            
+            # Extract the pipeline section
+            if 'pipeline' not in config_data:
+                raise ConfigValidationError("Pipeline config must have a 'pipeline' section")
+                
+            pipeline_data = config_data['pipeline']
+            pipeline_config = PipelineConfig(**pipeline_data)
+            return pipeline_config
+            
+        except yaml.YAMLError as e:
+            raise ConfigValidationError(f"Invalid YAML in {pipeline_path}: {e}")
+        except ValidationError as e:
+            raise ConfigValidationError(f"Invalid pipeline config in {pipeline_path}: {e}")
 
-    
     def create_chat_prompt_template(self, agent_name: str, template_name: str = "default") -> ChatPromptTemplate:
         """Create LangChain ChatPromptTemplate from configuration."""
         prompts_config = self.load_prompts_config(agent_name)

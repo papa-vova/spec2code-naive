@@ -1,0 +1,31 @@
+pipeline:
+  name: "spec2code_pipeline"
+  description: "Main pipeline for generating implementation plans from feature descriptions"
+  
+  # Sequential execution of agents
+  agents:
+    - name: "plan_maker"
+      input_mapping: "pipeline_input"  # Takes the initial pipeline input
+      output_key: "implementation_plan"  # Output will be stored with this key
+      prompt_template: "default"  # Use default prompt template from prompts.yaml
+      
+    - name: "plan_critique_generator"
+      input_mapping: "implementation_plan"  # Takes output from previous agent
+      output_key: "critique_report"  # Output will be stored with this key
+      prompt_template: "technical_feasibility"  # Use specific prompt template
+      
+    - name: "plan_critique_comparator"
+      input_mapping: "critique_report"  # Takes output from previous agent
+      output_key: "comparison_result"  # Final output
+      prompt_template: "default"
+  
+  # Execution settings
+  execution:
+    mode: "sequential"  # Future: could be "parallel"
+    template_selection: "specified"  # "specified" uses prompt_template per agent, "all" runs all templates
+    
+  # Pipeline-level settings
+  settings:
+    dry_run_supported: true
+    logging_enabled: true
+    config_validation: true

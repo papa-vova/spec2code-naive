@@ -7,12 +7,8 @@ import sys
 import argparse
 import time
 from typing import List, Dict, Any
-from config_system.config_loader import ConfigLoader, ConfigValidationError
-from config_system.agent_factory import AgentFactory
-from exceptions import (
-    PipelineError, InputError, FileNotFoundError, EmptyFileError,
-    PlanGenerationError, ReportGenerationError, MetricComparisonError
-)
+from core.orchestrator import Orchestrator
+from exceptions import PipelineError, InputError, FileNotFoundError, EmptyFileError
 from logging_config import setup_pipeline_logging, log_step_start, log_step_complete, log_debug, log_error
 
 
@@ -20,180 +16,39 @@ class Pipeline:
     """Main pipeline for processing requirements and generating plans."""
     
     def __init__(self, config_root: str = "./config", dry_run: bool = False):
-        """Initialize pipeline with config-driven agent creation."""
+        """Initialize pipeline with config-driven orchestrator."""
         self.config_root = config_root
         self.dry_run = dry_run
-        
-        # Initialize config loader and agent factory
-        self.config_loader = ConfigLoader(config_root)
-        self.agent_factory = AgentFactory(self.config_loader)
-        
-        # Declarative list of required agents
-        required_agents = [
-            "plan_maker",
-            "plan_critique_generator", 
-            "plan_critique_comparator"
-        ]
-        
-        # Create all agents from the list
-        try:
-            self.agents = self.agent_factory.create_agents(required_agents, dry_run)
-            
-            # Access agents cleanly
-            self.plan_maker = self.agents['plan_maker']
-            self.report_generator = self.agents['plan_critique_generator']  # Single instance for now
-            self.comparator = self.agents['plan_critique_comparator']
-            
-        except ConfigValidationError as e:
-            if dry_run:
-                logger.warning(f"Config validation failed in dry-run mode: {e}")
-                # In dry-run mode, we can still proceed with minimal setup
-                self.plan_maker = None
-                self.report_generator = None
-                self.comparator = None
-            else:
-                raise PipelineError(f"Failed to initialize agents: {e}")
-        
-        # Pipeline settings
-        self.n_reports = 1  # Single report generator for now
         self.logger = None
+        
+        # Initialize orchestrator
+        try:
+            self.orchestrator = Orchestrator(config_root, dry_run)
+        except Exception as e:
+            raise PipelineError(f"Failed to initialize orchestrator: {e}")
     
     def set_logger(self, logger):
         """Set the logger for this pipeline instance."""
         self.logger = logger
+        # Also set logger on orchestrator
+        if hasattr(self, 'orchestrator'):
+            self.orchestrator.set_logger(logger)
     
     def run_pipeline(self, input_description: str) -> Dict[str, Any]:
         """
-        Execute the complete pipeline.
+        Execute the pipeline using the config-driven orchestrator.
         
         Args:
             input_description: Free text description of what should be done
             
         Returns:
-            Dictionary containing all results and final metric decision
-            
-        Raises:
-            PlanGenerationError: If plan creation fails
-            ReportGenerationError: If report generation fails
-            MetricComparisonError: If metric comparison fails
+            Dictionary containing the orchestrator result
         """
-        try:
-            # Log pipeline start
-            if self.logger:
-                log_step_start(self.logger, "Pipeline", "execution", "Starting pipeline execution", {
-                    "input_length": len(input_description),
-                    "input_preview": input_description[:100] + ("..." if len(input_description) > 100 else "")
-                })
-            
-            # Step: Make a plan of implementing the whole set of steps
-            plan_start_time = time.time()
-            try:
-                if self.logger:
-                    log_step_start(self.logger, "PlanMaker", "plan_generation", "Creating implementation plan")
-                
-                implementation_plan = self.plan_maker.create_plan(input_description)
-                
-                plan_duration = (time.time() - plan_start_time) * 1000
-                if self.logger:
-                    log_step_complete(self.logger, "PlanMaker", "plan_generation", "Plan creation completed", {
-                        "plan_length": len(implementation_plan)
-                    }, plan_duration)
-                    
-            except Exception as e:
-                if self.logger:
-                    log_error(self.logger, f"Plan generation failed: {str(e)}", "PlanMaker", e)
-                raise PlanGenerationError(f"Failed to create implementation plan: {str(e)}")
-            
-            # Step: Generate critical report on the plan's consistency
-            reports_start_time = time.time()
-            reports = []
-            try:
-                if self.logger:
-                    log_step_start(self.logger, "ReportGenerator", "report_generation", 
-                                 "Generating critical report on plan")
-                
-                # Generate single report for now
-                report_start_time = time.time()
-                
-                if self.logger:
-                    log_debug(self.logger, "Generating critical report", "ReportGenerator", {
-                            "report_type": self.report_generator.report_type.value
-                        })
-                    
-                report = self.report_generator.generate_report(implementation_plan)
-                reports.append(report)
-                
-                report_duration = (time.time() - report_start_time) * 1000
-                if self.logger:
-                    log_debug(self.logger, "Report completed", "ReportGenerator", {
-                        "score": report['score'],
-                        "type": report['type'],
-                        "duration_ms": report_duration
-                    })
-                        
-                reports_duration = (time.time() - reports_start_time) * 1000
-                if self.logger:
-                    log_step_complete(self.logger, "ReportGenerator", "report_generation", 
-                                    "All reports generated", {
-                                        "reports_count": len(reports)
-                                    }, reports_duration)
-                    
-            except Exception as e:
-                if self.logger:
-                    log_error(self.logger, f"Report generation failed: {str(e)}", "ReportGenerator", e)
-                raise ReportGenerationError(f"Failed to generate reports: {str(e)}")
-            
-            # Step: Do an independent comparison of the reports and generate a metric
-            comparison_start_time = time.time()
-            try:
-                if self.logger:
-                    log_step_start(self.logger, "MetricComparator", "metric_comparison", 
-                                 "Comparing reports and generating metric")
-                
-                comparison_result = self.comparator.compare_reports(reports)
-                
-                comparison_duration = (time.time() - comparison_start_time) * 1000
-                if self.logger:
-                    log_step_complete(self.logger, "MetricComparator", "metric_comparison", 
-                                    "Metric comparison completed", {
-                                        "metric": comparison_result['metric'],
-                                        "consistency": comparison_result['consistency'],
-                                        "status": comparison_result['status']
-                                    }, comparison_duration)
-                    
-            except Exception as e:
-                if self.logger:
-                    log_error(self.logger, f"Metric comparison failed: {str(e)}", "MetricComparator", e)
-                raise MetricComparisonError(f"Failed to compare reports: {str(e)}")
-            
-            # Check if metric is OK (decision point from flow)
-            metric_ok = self.comparator.is_metric_ok(comparison_result)
-            
-            # Log final decision
-            if self.logger:
-                next_action = "loop_back" if not metric_ok else "proceed"
-                log_step_complete(self.logger, "Pipeline", "execution", "Pipeline execution completed", {
-                    "metric_ok": metric_ok,
-                    "next_action": next_action,
-                    "final_metric": comparison_result['metric'],
-                    "final_status": comparison_result['status']
-                })
-            
-            return {
-                "input_description": input_description,
-                "implementation_plan": implementation_plan,
-                "reports": reports,
-                "comparison_result": comparison_result,
-                "metric_ok": metric_ok,
-                "next_action": "loop_back" if not metric_ok else "proceed"
-            }
-            
-        except (PlanGenerationError, ReportGenerationError, MetricComparisonError):
-            # Re-raise our custom exceptions
-            raise
-        except Exception as e:
-            # Catch any unexpected errors and wrap them
-            raise PipelineError(f"Unexpected error in pipeline execution: {str(e)}")
+        # Prepare input data for orchestrator
+        input_data = {"description": input_description}
+        
+        # Execute pipeline using orchestrator
+        return self.orchestrator.execute_pipeline(input_data)
 
 
 def main():
@@ -261,7 +116,7 @@ def main():
         
         logger.info("Starting SPEC2CODE pipeline execution", extra={
             "component": "Main",
-            "data": {"pipeline_type": "NAIVE_FLOW"}
+            "data": {"pipeline_type": "CONFIG_DRIVEN"}
         })
         
         # Initialize and run pipeline
@@ -283,9 +138,8 @@ def main():
         logger.info("Pipeline execution completed successfully", extra={
             "component": "Main",
             "data": {
-                "execution_successful": True,
-                "final_metric": results['comparison_result']['metric'],
-                "metric_ok": results['metric_ok']
+                "execution_successful": results.get('execution_successful', True),
+                "pipeline_name": results.get('pipeline_name', 'unknown')
             }
         })
         
@@ -296,12 +150,7 @@ def main():
             # Fallback if logger not set up yet
             print(f"Input Error: {e}", file=sys.stderr)
         sys.exit(1)
-    except (PlanGenerationError, ReportGenerationError, MetricComparisonError) as e:
-        if 'logger' in locals():
-            log_error(logger, f"Pipeline error: {str(e)}", "Main", e)
-        else:
-            print(f"Pipeline Error: {e}", file=sys.stderr)
-        sys.exit(1)
+
     except PipelineError as e:
         if 'logger' in locals():
             log_error(logger, f"Pipeline error: {str(e)}", "Main", e)
