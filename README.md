@@ -1,28 +1,37 @@
 # spec2code-naïve
 
 ## Project Overview
-A multi-agent LangChain application that generates implementation plans from feature descriptions. The system processes free-text descriptions through a pipeline of planning, critique generation, and metric comparison.
+A fully configurable, multi-agent LangChain pipeline system that processes feature descriptions through sequential agent execution. The system features a unified agent architecture with dynamic model provider discovery, enabling zero-maintenance support for any LangChain-compatible LLM provider.
+
+## Key Features
+- **Unified Agent Architecture**: Single `Agent` class configured entirely through YAML files
+- **Dynamic Model Provider Discovery**: Automatic support for any LangChain provider (OpenAI, Anthropic, Ollama, etc.)
+- **Config-Driven Pipeline**: Sequential agent execution defined by `pipeline.yaml`
+- **JSON I/O Pipeline**: Standardized data passing between agents
+- **Comprehensive Logging**: Structured JSON logging throughout execution
+- **Zero Hardcoded Logic**: Everything configurable via YAML files
 
 ## Directory Structure
 
 ```
 spec2code-naive/
-├── main.py                           # Main entry point and pipeline orchestration
+├── main.py                           # Main entry point and CLI interface
 ├── requirements.txt                  # Python dependencies
 ├── sample_input.txt                  # Sample input file for testing
 ├── cli_config.py                     # CLI configuration management tool
 ├── exceptions.py                     # Custom exception classes for error handling
 ├── logging_config.py                 # JSON logging configuration and utilities
 │
-├── agents/                           # Core agent implementations
-│   ├── __init__.py                   # Package initialization
-│   ├── plan_maker.py                 # Agent that creates implementation plans
-│   ├── plan_critique_generator.py    # Agents that generate critical reports
-│   └── plan_critique_comparator.py   # Agent that compares reports and generates metrics
+├── core/                             # Core system components
+│   ├── agent.py                      # Unified Agent class with LangChain execution
+│   └── orchestrator.py               # Config-driven pipeline orchestrator
 │
-├── config/                           # Configuration files for agents and models
+├── config/                           # Configuration files for agents, models, and pipeline
+│   ├── pipeline.yaml                 # Pipeline configuration (agent sequence, I/O mapping)
 │   ├── models/
-│   │   └── openai_gpt4.yaml          # OpenAI GPT-4 model configuration
+│   │   ├── openai_gpt4.yaml          # OpenAI GPT-4 model configuration
+│   │   ├── anthropic_claude.yaml     # Anthropic Claude model configuration
+│   │   └── ollama_llama.yaml         # Ollama Llama model configuration
 │   └── agents/
 │       ├── plan_maker/
 │       │   ├── agent.yaml            # Plan maker agent configuration
@@ -36,7 +45,8 @@ spec2code-naive/
 │
 ├── config_system/                    # Configuration loading and validation system
 │   ├── __init__.py                   # Package initialization
-│   └── config_loader.py              # Configuration loader with validation
+│   ├── config_loader.py              # Configuration loader with validation
+│   └── agent_factory.py              # Dynamic agent and model factory
 │
 └── docs/                             # Documentation and specifications
     ├── spec2code-naïve raw initial plan.md    # Original project plan
@@ -44,96 +54,83 @@ spec2code-naive/
     └── spec2code - a bit less naïve flow.jpg  # Flow diagram (Image)
 ```
 
-## File Descriptions
+## Quick Start
 
-### Core Application Files
+### Installation
+```bash
+# Clone the repository
+git clone <repository-url>
+cd spec2code-naive
 
-**`main.py`**
-- Main entry point for the application
-- Implements the `Pipeline` class that orchestrates the entire workflow
-- Handles CLI argument parsing (requires `-i/--input` for input file)
-- Executes steps: plan creation → report generation → metric comparison
-- Provides comprehensive error handling and user feedback
+# Install dependencies
+pip install -r requirements.txt
 
-**`requirements.txt`**
-- Lists Python package dependencies
-- Includes LangChain, OpenAI, and other required libraries
+# Install your preferred LangChain provider (examples):
+pip install langchain-openai      # For OpenAI models
+pip install langchain-anthropic   # For Anthropic models  
+pip install langchain-ollama      # For Ollama models
+# Any Future Provider:
+# Just install the langchain-{provider} package and set provider name in config
+```
 
-**`sample_input.txt`**
-- Sample input file containing a feature description
-- Used for testing the pipeline with a task management application example
-- Can be replaced with any project description
+### Environment Setup
+```bash
+# Set your API key (choose one based on your provider)
+export OPENAI_API_KEY="your-openai-key"
+export ANTHROPIC_API_KEY="your-anthropic-key"
+# Ollama runs locally, no API key needed
+```
 
-**`cli_config.py`**
-- CLI configuration utilities
-- Handles command-line argument processing and validation
+### Usage
+```bash
+# Run with dry-run mode (no LLM calls, uses dummy outputs)
+python main.py -i sample_input.txt --dry-run
 
-**`exceptions.py`**
-- Custom exception classes for error handling
-- Defines specific exceptions for pipeline errors, agent failures, and configuration issues
+# Run with actual LLM execution
+python main.py -i sample_input.txt
 
-**`logging_config.py`**
-- JSON logging configuration and utilities
-- Defines logging formats, levels, and handlers for the application
+# Use custom config directory
+python main.py -i sample_input.txt --config-root /path/to/config
+```
 
-### Agent Implementations
+## Architecture Overview
 
-**`agents/plan_maker.py`**
-- `PlanMakerAgent`: Creates detailed implementation plans from feature descriptions
-- Takes free-text input and generates structured implementation tasks
-- Uses LangChain prompts and can integrate with LLM models
-- Includes fallback skeleton implementation for testing
+### Core Components
 
-**`agents/plan_critique_generator.py`**
-- `ReportGeneratorAgent`: Generates critical analysis reports on implementation plans
-- Creates multiple independent reports with different focus areas:
-  - Technical feasibility analysis
-  - Resource adequacy assessment
-  - Timeline realism evaluation
-  - Dependency analysis
-- Each report includes scores, summaries, and detailed feedback
+**`core/agent.py`** - Unified Agent Class
+- Single `Agent` class that replaces all individual agent implementations
+- Configured entirely through YAML files (no hardcoded logic)
+- Supports actual LangChain execution with any provider
+- Handles prompt templates, system messages, and JSON I/O
+- Includes comprehensive error handling and logging
 
-**`agents/plan_critique_comparator.py`**
-- `MetricComparatorAgent`: Compares multiple reports and generates final metrics
-- Analyzes consistency across different critique reports
-- Generates aggregate scores and recommendations
-- Determines if the plan is acceptable or needs revision
+**`core/orchestrator.py`** - Pipeline Orchestrator
+- Config-driven orchestrator that executes agents sequentially
+- Loads pipeline configuration from `config/pipeline.yaml`
+- Manages JSON data passing between agents
+- Provides detailed logging and error handling
+- Supports different execution modes (sequential, future: parallel)
 
-### Configuration System
+**`config_system/`** - Configuration System
+- **`config_loader.py`**: Loads and validates all YAML configurations
+- **`agent_factory.py`**: Dynamic factory with zero-maintenance model provider discovery
+- Supports any LangChain provider through naming conventions
+- Automatic credential and parameter handling
 
-**`config_system/config_loader.py`**
-- `ConfigLoader`: Loads and validates YAML configuration files
-- Handles model configurations (temperature, tokens, etc.)
-- Manages agent configurations (tools, memory, prompts)
-- Provides caching and validation for all config files
-- Supports LangChain message types and prompt templates
+## System Features
 
-**`config/models/openai_gpt4.yaml`**
-- Configuration for OpenAI GPT-4 model
-- Defines model parameters: temperature, max_tokens, top_p
-- Includes API key reference and streaming settings
+### Dynamic Model Provider Discovery
+- **Zero Maintenance**: Automatically supports any LangChain provider without code changes
+- **Naming Convention**: Uses `langchain_{provider}` + `Chat{Provider}` pattern
+- **Generic Parameters**: Any provider-specific parameters supported through config
+- **Environment Variables**: Secure credential management with `${VAR_NAME}` expansion
 
-**`config/agents/*/agent.yaml`**
-- Agent-specific configurations
-- Defines LLM model to use, tools, memory settings
-- Specifies agent type and execution parameters
-
-**`config/agents/*/prompts.yaml`**
-- Prompt templates for each agent
-- System messages, human message templates
-- Specialized prompts for different report types
-
-### Documentation
-
-**`docs/spec2code-naïve raw initial plan.md`**
-- Original project specification and planning document
-- Describes the multi-agent workflow and implementation approach
-- Contains detailed flow descriptions for planning/analysis branch
-
-**`docs/spec2code - a bit less naïve flow.*`**
-- Visual flow diagrams showing the complete pipeline process
-- Available in both PDF and JPG formats
-- Illustrates decision points and data flow between agents
+### Pipeline Execution Flow
+1. **Input Processing**: Reads feature description from file
+2. **Agent Orchestration**: Executes agents sequentially based on pipeline config
+3. **Data Passing**: JSON output from each agent becomes input for the next
+4. **Logging**: Comprehensive structured logging throughout execution
+5. **Error Handling**: Graceful failure with detailed error messages
 
 ## Usage
 
