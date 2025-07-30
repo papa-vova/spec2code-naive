@@ -97,7 +97,7 @@ class Orchestrator:
                         f"Executing agent {i+1}/{len(self.pipeline_config.agents)}: {agent_config.name}",
                         {
                             "agent_name": agent_config.name,
-                            "input_mapping": agent_config.input_mapping,
+                            "input_key": agent_config.input_key,
                             "output_key": agent_config.output_key,
                             "prompt_templates": agent_config.prompt_templates
                         }
@@ -167,16 +167,16 @@ class Orchestrator:
     
     def _prepare_agent_input(self, pipeline_data: Dict[str, Any], agent_config) -> Dict[str, Any]:
         """Prepare input data for an agent based on its input mapping."""
-        input_mapping = agent_config.input_mapping
+        input_key = agent_config.input_key
         
-        if input_mapping == "pipeline_input":
+        if input_key == "pipeline_input":
             # Use the original pipeline input
             input_data = pipeline_data["pipeline_input"]
-        elif input_mapping in pipeline_data:
+        elif input_key in pipeline_data:
             # Use output from a previous agent
-            input_data = pipeline_data[input_mapping]
+            input_data = pipeline_data[input_key]
         else:
-            raise PipelineError(f"Invalid input mapping '{input_mapping}' for agent '{agent_config.name}'")
+            raise PipelineError(f"Invalid input key '{input_key}' for agent '{agent_config.name}'")
         
         # Wrap in standard format if it's not already
         if isinstance(input_data, dict) and "input" in input_data:

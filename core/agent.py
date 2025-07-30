@@ -113,17 +113,24 @@ class Agent:
             if hasattr(self.prompts, 'system_message') and self.prompts.system_message:
                 messages.append(SystemMessage(content=self.prompts.system_message))
             
-            # 2. Add generic human message template (pipeline context)
+            # 2. Add human message template (ALWAYS included)
             if hasattr(self.prompts, 'human_message_template') and self.prompts.human_message_template:
-                generic_human_content = self.prompts.human_message_template.format(
+                human_content = self.prompts.human_message_template.format(
                     input=input_content,
                     **input_data  # Allow additional template variables
                 )
-                messages.append(HumanMessage(content=generic_human_content))
-            
-            # 3. Add specific human prompt from prompt_templates (specific request/question)
-            specific_human_content = self._get_template_content(template_name, input_content, input_data)
-            messages.append(HumanMessage(content=specific_human_content))
+                messages.append(HumanMessage(content=human_content))
+        
+            # 3. Add specific prompt template if available and specified
+            if (hasattr(self.prompts, 'prompt_templates') and 
+                self.prompts.prompt_templates and 
+                template_name in self.prompts.prompt_templates):
+                
+                template_content = self.prompts.prompt_templates[template_name].format(
+                    input=input_content,
+                    **input_data  # Allow additional template variables
+                )
+                messages.append(HumanMessage(content=template_content))
             
             # 4. Add AI message prefix if available (optional AI response starter)
             if hasattr(self.prompts, 'ai_message_prefix') and self.prompts.ai_message_prefix:
@@ -162,40 +169,4 @@ class Agent:
                 "error": str(e)
             }
 
-    def _get_template_content(self, template_name: str, input_content: str, input_data: Dict[str, Any]) -> str:
-        """Get the template content from prompt_templates dictionary."""
-        try:
-            # All templates must come from the prompt_templates dictionary
-            if not (hasattr(self.prompts, 'prompt_templates') and self.prompts.prompt_templates):
-                raise ValueError(f"Agent {self.config.name} has no prompt_templates defined")
-            
-            if template_name not in self.prompts.prompt_templates:
-                raise ValueError(f"Template '{template_name}' not found in agent {self.config.name} prompt_templates")
-            
-            template_content = self.prompts.prompt_templates[template_name]
-            
-            # Format the template with input data
-            formatted_content = template_content.format(
-                decomposed_steps=input_content,
-                input=input_content,
-                **input_data  # Allow any additional template variables
-            )
-            
-            return formatted_content
-            
-        except KeyError as e:
-            # Handle missing template variables
-            if self.logger:
-                self.logger.warning(f"Template formatting error: {str(e)}, using input directly", extra={
-                    "component": self.config.name,
-                    "data": {"template_name": template_name, "error": str(e)}
-                })
-            return input_content
-        except Exception as e:
-            # Handle any other template errors
-            if self.logger:
-                self.logger.error(f"Template processing error: {str(e)}, using input directly", extra={
-                    "component": self.config.name,
-                    "data": {"template_name": template_name, "error": str(e)}
-                })
-            return input_content
+

@@ -5,17 +5,17 @@ pipeline:
   # Sequential execution of agents
   agents:
     - name: "plan_maker"
-      input_mapping: "pipeline_input"  # Takes the initial pipeline input
+      input_key: "pipeline_input"  # Takes the initial pipeline input
       output_key: "implementation_plan"  # Output will be stored with this key
       prompt_templates: "with_context"  # Use with_context template from prompts.yaml
       
     - name: "plan_critique_generator"
-      input_mapping: "implementation_plan"  # Takes output from previous agent
+      input_key: "implementation_plan"  # Takes output from previous agent
       output_key: "critique_report"  # Output will be stored with this key
       prompt_templates: "technical_feasibility"  # Use technical_feasibility template from prompts.yaml
       
     - name: "plan_critique_comparator"
-      input_mapping: "critique_report"  # Takes output from previous agent
+      input_key: "critique_report"  # Takes output from previous agent
       output_key: "comparison_result"  # Final output
       prompt_templates: "detailed_comparison"  # Use detailed_comparison template from prompts.yaml
   

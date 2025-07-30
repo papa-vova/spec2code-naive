@@ -42,7 +42,7 @@ When the pipeline starts, it creates a data context:
 ### 2. Agent Execution and Data Mapping
 
 Each agent in the pipeline config specifies:
-- **`input_mapping`**: Where to get input data FROM
+- **`input_key`**: Where to get input data FROM
 - **`output_key`**: Where to store output data TO
 
 Let's trace through the actual execution:
@@ -50,7 +50,7 @@ Let's trace through the actual execution:
 #### Agent 1: plan_maker
 ```yaml
 - name: "plan_maker"
-  input_mapping: "pipeline_input"      # Gets original input
+  input_key: "pipeline_input"      # Gets original input
   output_key: "implementation_plan"    # Stores result here
 ```
 
@@ -79,7 +79,7 @@ Let's trace through the actual execution:
 #### Agent 2: plan_critique_generator
 ```yaml
 - name: "plan_critique_generator"
-  input_mapping: "implementation_plan"  # Gets previous agent's output
+  input_key: "implementation_plan"  # Gets previous agent's output
   output_key: "critique_report"         # Stores result here
 ```
 
@@ -90,36 +90,7 @@ Let's trace through the actual execution:
    - `pipeline_data["agent_outputs"]["plan_critique_generator"] = full_agent_response`
    - `pipeline_data["critique_report"] = agent_response["output"]`
 
-**Pipeline data after Agent 2:**
-```json
-{
-  "pipeline_input": "Original input text",
-  "implementation_plan": {...},
-  "critique_report": {
-    "agent_response": "Generated critique report...",
-    "processed_input": {...},
-    "agent_type": "plan_critique_generator"
-  },
-  "agent_outputs": {
-    "plan_maker": {...},
-    "plan_critique_generator": {...}
-  }
-}
-```
-
-#### Agent 3: plan_critique_comparator
-```yaml
-- name: "plan_critique_comparator"
-  input_mapping: "critique_report"     # Gets Agent 2's output
-  output_key: "comparison_result"      # Stores result here
-```
-
-**Execution:**
-1. Agent gets input: `pipeline_data["critique_report"]` (from Agent 2)
-2. Agent processes and returns final result
-3. System stores both detailed and final outputs
-
-### 3. Key Input Mapping Options
+### 3. Key Input Key Options
 
 - **`"pipeline_input"`**: Uses the original input text from the file
 - **`"<any_output_key>"`**: Uses the output from whichever agent wrote to that key
@@ -166,9 +137,9 @@ settings:
 - **Logging**: Always enabled, level configurable
 - **Validation**: Always enforced at runtime
 
-### 5. The Critical Insight
+### 6. The Critical Insight
 
-The `output_key` creates a **named slot** in the pipeline data that subsequent agents can reference via `input_mapping`. This creates a **declarative data flow** where:
+The `output_key` creates a **named slot** in the pipeline data that subsequent agents can reference via `input_key`. This creates a **declarative data flow** where:
 
 - You define WHAT data flows WHERE
 - You don't need to hardcode HOW agents connect
@@ -183,56 +154,116 @@ This is why the system is so flexible - the pipeline configuration acts as a **d
 
 Defines the overall pipeline execution flow, agent sequence, and data mapping.
 
+#### Generic Structure:
 ```yaml
-name: "spec2code_pipeline"
-execution_mode: "sequential"  # Currently only sequential supported
-agents:
-  - name: "plan_maker"                    # Must match agent directory name
-    input_mapping: "pipeline_input"      # Where this agent gets its input
-    output_key: "implementation_plan"    # Key name for this agent's output
-    prompt_template: "default"           # Which prompt template to use
-  - name: "plan_critique_generator"
-    input_mapping: "implementation_plan" # Uses previous agent's output
-    output_key: "critique_report"
-    prompt_template: "technical_feasibility"
-  - name: "plan_critique_comparator"
-    input_mapping: "critique_report"
-    output_key: "comparison_result"
-    prompt_template: "default"
+pipeline:
+  name: "pipeline_name"
+  description: "Pipeline description"
+  
+  # Agent execution sequence
+  agents:
+    - name: "agent_name"              # Must match agent directory name
+      input_key: "data_source"        # Where this agent gets its input
+      output_key: "result_key"        # Key name for this agent's output
+      prompt_templates: "template"    # Optional: specific template(s) to use
+  
+  # Execution settings
+  execution:
+    mode: "sequential"               # Currently only sequential supported
+    
+  # Pipeline-level settings
+  settings:
+    log_level: "INFO"               # DEBUG, INFO, WARNING, ERROR
+    
+  # Common model parameters (optional)
+  common_model_parameters:
+    temperature: 0.7                # Applied to all models unless overridden
+    top_p: 1.0                     # Applied to all models unless overridden
+    streaming: false               # Applied to all models unless overridden
 ```
 
-#### Pipeline Parameters:
-- **`name`**: Pipeline identifier (string)
-- **`execution_mode`**: How agents are executed (`"sequential"` only for now)
-- **`agents`**: List of agent execution configurations
+#### Parameters:
+- **`name`**: Unique identifier for the pipeline
+- **`description`**: Human-readable description of pipeline purpose
+- **`agents`**: List of agents to execute in sequence
+  - **`name`**: Agent identifier (must match directory in `agents/`)
+  - **`input_key`**: Where this agent gets input data from:
+    - `"pipeline_input"`: Uses the original pipeline input
+    - `"<output_key>"`: Uses output from previous agent with that key
+  - **`output_key`**: Key name for storing this agent's output in pipeline data
+  - **`prompt_templates`**: (Optional) Which prompt template(s) to use
+- **`execution.mode`**: Execution mode (currently only "sequential")
+- **`settings.log_level`**: Logging level (DEBUG, INFO, WARNING, ERROR)
+- **`common_model_parameters`**: (Optional) Default parameters applied to all models
 
-#### Agent Execution Parameters:
-- **`name`**: Agent name (must match directory in `agents/`)
-- **`input_mapping`**: Where this agent gets input data from:
-  - `"pipeline_input"`: Uses the original pipeline input
-  - `"<output_key>"`: Uses output from previous agent with that key
-- **`output_key`**: Key name for storing this agent's output in pipeline data
-- **`prompt_template`**: Which prompt template to use (`"default"` or specific template name)
+#### Example:
+```yaml
+pipeline:
+  name: "spec2code_pipeline"
+  description: "Generate implementation plans from feature descriptions"
+  
+  agents:
+    - name: "plan_maker"
+      input_key: "pipeline_input"
+      output_key: "implementation_plan"
+      prompt_templates: "with_context"
+      
+    - name: "plan_critique_generator"
+      input_key: "implementation_plan"
+      output_key: "critique_report"
+      prompt_templates: "technical_feasibility"
+      
+    - name: "plan_critique_comparator"
+      input_key: "critique_report"
+      output_key: "comparison_result"
+  
+  execution:
+    mode: "sequential"
+    
+  settings:
+    log_level: "INFO"
+    
+  common_model_parameters:
+    temperature: 0.7
+    streaming: false
+```
 
 ### 2. Model Configuration (`models/*.yaml`)
 
 Defines LLM model providers, parameters, and credentials. The system uses dynamic provider discovery, supporting any LangChain-compatible provider.
 
-#### Generic Model Structure:
+#### Generic Structure:
 ```yaml
 name: "model_identifier"
-provider: "provider_name"     # e.g., "openai", "anthropic", "ollama"
-model_name: "specific_model"  # e.g., "gpt-4", "claude-3-sonnet"
-parameters:                   # Provider-specific parameters
-  temperature: 0.7
-  max_tokens: 2000
-  # ... any other parameters
-credentials:                  # Provider-specific credentials
-  api_key: "${API_KEY_VAR}"   # Environment variable expansion
-  # ... any other credentials
+provider: "provider_name"          # LangChain provider (e.g., "openai", "anthropic", "ollama")
+model_name: "specific_model"       # Provider-specific model name
+parameters:                        # Model-specific parameters (passed directly to LLM)
+  temperature: 0.7                 # Randomness (0.0-1.0)
+  max_tokens: 2000                 # Maximum response tokens
+  top_p: 1.0                      # Nucleus sampling (0.0-1.0)
+  streaming: false                 # Enable streaming responses
+  # Any provider-specific parameters...
+credentials:                       # Authentication/connection parameters
+  api_key: "${ENV_VAR}"           # Environment variable expansion
+  # Any provider-specific credentials...
 ```
 
-#### OpenAI Example (`models/openai_gpt4.yaml`):
+#### Parameters:
+- **`name`**: Unique identifier for this model configuration
+- **`provider`**: LangChain provider name (used for dynamic import: `langchain_{provider}`)
+- **`model_name`**: Specific model name within the provider
+- **`parameters`**: Dict of model-specific parameters - **all parameters are passed directly to the LLM constructor**
+- **`credentials`**: Dict of authentication/connection parameters
+
+#### Parameter Pass-Through System:
+The system passes **all parameters** from the model config directly to the LLM constructor. This means:
+- Provider-specific parameters work automatically (e.g., `num_predict` for Ollama)
+- No parameter mapping needed
+- You can add any provider-specific parameter to your model config
+- Common parameters from pipeline config are merged with individual model parameters
+- Individual model parameters take precedence over common parameters
+
+#### Example:
 ```yaml
 name: "openai_gpt4"
 provider: "openai"
@@ -246,62 +277,93 @@ credentials:
   api_key: "${OPENAI_API_KEY}"
 ```
 
-#### Anthropic Example (`models/anthropic_claude.yaml`):
+### 3. Agent Configuration
+
+Agent configuration consists of **two files** that work together:
+
+#### 3.1. Agent Metadata (`agents/*/agent.yaml`)
+
+Defines agent metadata, model reference, and LangChain-specific settings.
+
+##### Generic Structure:
 ```yaml
-name: "anthropic_claude"
-provider: "anthropic"
-model_name: "claude-3-sonnet-20240229"
-parameters:
-  temperature: 0.7
-  max_tokens: 2000
-credentials:
-  api_key: "${ANTHROPIC_API_KEY}"
+name: "agent_name"
+description: "Agent purpose description"
+llm: "model_config_name"           # Must match filename in models/ directory
+tools:                             # Optional: Tool configurations
+  - name: "tool_name"
+    description: "Tool description"
+    _type: "tool_type"
+    # Tool-specific parameters...
+memory:                            # Optional: Memory configuration
+  _type: "memory_type"
+  max_token_limit: 2000
+agent_type: "agent_type"           # Optional: LangChain agent type
+max_iterations: 3                  # Optional: Maximum execution iterations
+early_stopping_method: "generate"  # Optional: Stopping method
 ```
 
-#### Ollama Example (`models/ollama_llama.yaml`):
-```yaml
-name: "ollama_llama"
-provider: "ollama"
-model_name: "llama2"
-parameters:
-  temperature: 0.7
-  num_predict: 2000
-credentials:
-  base_url: "http://localhost:11434"
-```
-
-#### Model Configuration Parameters:
-- **`name`**: Unique identifier for this model configuration
-- **`provider`**: LangChain provider name (used for dynamic import: `langchain_{provider}`)
-- **`model_name`**: Specific model name within the provider
-- **`parameters`**: Dict of model-specific parameters (temperature, max_tokens, etc.)
-- **`credentials`**: Dict of authentication/connection parameters
-
-#### Common Model Parameters:
-- **`temperature`**: Randomness in output (0.0-1.0, default: 0.7)
-- **`max_tokens`**: Maximum tokens in response (default: 2000)
-- **`top_p`**: Nucleus sampling parameter (0.0-1.0, default: 1.0)
-- **`streaming`**: Enable streaming responses (boolean, default: false)
-
-### 3. Agent Configuration (`agents/*/agent.yaml`)
-
-Defines agent metadata and model references.
-
-```yaml
-name: "plan_maker"
-description: "Creates detailed implementation plans from feature descriptions"
-llm: "openai_gpt4"  # References a model config by name
-```
-
-#### Agent Parameters:
+##### Parameters:
 - **`name`**: Agent identifier (should match directory name)
 - **`description`**: Human-readable description of agent purpose
-- **`llm`**: Reference to model configuration name (from `models/` directory)
+- **`llm`**: Reference to model configuration name (must exactly match a file in `models/` directory)
+- **`tools`**: (Optional) List of tool configurations for the agent
+- **`memory`**: (Optional) Memory configuration for the agent
+- **`agent_type`**: (Optional) LangChain agent type (default: "zero-shot-react-description")
+- **`max_iterations`**: (Optional) Maximum execution iterations (default: 3)
+- **`early_stopping_method`**: (Optional) Early stopping method (default: "generate")
 
-### 4. Prompt Configuration (`agents/*/prompts.yaml`)
+##### Example:
+```yaml
+name: "plan_maker"
+description: "Creates detailed implementation plans from decomposed steps"
+llm: "openai_gpt4"
+tools:
+  - name: "file_reader"
+    description: "Read context files for planning"
+    _type: "file_reader"
+    base_path: "./context"
+memory:
+  _type: "buffer"
+  max_token_limit: 2000
+```
 
-Defines prompt templates and system messages for each agent.
+#### 3.2. Prompt Configuration (`agents/*/prompts.yaml`)
 
+Defines prompt templates and system messages for the agent.
+
+##### Generic Structure:
+```yaml
+system_message: |
+  System message defining the agent's role and behavior.
+  Can be multi-line.
+
+human_message_template: |
+  Template for human messages with variables like {input}.
+  This is the fallback when no prompt_templates are defined.
+
+ai_message_prefix: |              # Optional: AI message prefix
+  Optional prefix for AI responses.
+
+prompt_templates:                 # Optional: Named template variations
+  template_name1: |
+    Template content with {input} variables.
+  template_name2: |
+    Another template variation.
+```
+
+##### Parameters:
+- **`system_message`**: (Required) System prompt defining agent's role and behavior
+- **`human_message_template`**: (Required) Template for human messages, supports variables like `{input}`
+- **`ai_message_prefix`**: (Optional) Prefix for AI responses
+- **`prompt_templates`**: (Optional) Dict of named template variations for different scenarios
+
+##### Template Variables:
+- **`{input}`**: The main input content
+- **`{decomposed_steps}`**: Alias for input (legacy compatibility)
+- **Any key from input JSON**: Can reference specific input fields
+
+##### Example:
 ```yaml
 system_message: |
   You are a technical planning agent. Your role is to create detailed 
@@ -312,40 +374,22 @@ human_message_template: |
   implementation plan.
   
   Decomposed Steps:
-  {decomposed_steps}
+  {input}
   
   Create an implementation plan that includes:
-  1. Ordered sequence of implementation tasks
-  2. Dependencies between tasks  
-  3. Estimated complexity for each task
-  4. Required resources/technologies
+  - Technical approach
+  - Implementation steps
+  - Dependencies and requirements
 
-# Optional: Multiple prompt templates
-templates:
-  technical_feasibility: |
-    Analyze the technical feasibility of the following implementation plan:
-    {input}
+prompt_templates:
+  with_context: |
+    Create an implementation plan for: {input}
     
-    Focus on:
-    - Technical complexity assessment
-    - Resource requirements
-    - Potential risks and challenges
+    Consider the existing codebase context and dependencies.
   
-  default: |
-    Process the following input:
-    {input}
+  simple_plan: |
+    Create a basic implementation plan for: {input}
 ```
-
-#### Prompt Parameters:
-- **`system_message`**: System message sent to the LLM (sets agent behavior/role)
-- **`human_message_template`**: Template for human messages with variable substitution
-- **`templates`**: Optional dict of named prompt templates for different use cases
-
-#### Template Variables:
-Templates support variable substitution using `{variable_name}` syntax:
-- **`{input}`**: The main input content
-- **`{decomposed_steps}`**: Alias for input (legacy compatibility)
-- **Any key from input JSON**: Can reference specific input fields
 
 ## Environment Variables
 
@@ -426,9 +470,8 @@ To add a new agent to the pipeline:
    agents:
      # ... existing agents
      - name: "new_agent"
-       input_mapping: "previous_output_key"
+       input_key: "previous_output_key"
        output_key: "new_agent_output"
-       prompt_template: "default"
    ```
 
 ## Configuration Validation
@@ -453,30 +496,33 @@ python cli_config.py validate
 - Set reasonable token limits to control costs
 - Use environment variables for all credentials
 - Test with different temperature settings for your use case
+- All parameters are passed directly to the LLM - add any provider-specific parameters
 
 ### Agent Configuration:
 - Keep agent names short and descriptive
 - Use clear descriptions for documentation
 - Choose appropriate models for each agent's complexity
+- The `llm` field must exactly match the model config filename
 
 ### Prompt Configuration:
 - Write clear, specific system messages
 - Use template variables for flexibility
 - Test prompts with different input types
-- Consider creating multiple templates for different scenarios
+- `prompt_templates` are optional - the system falls back to `human_message_template`
 
 ### Pipeline Configuration:
 - Design clear data flow between agents
 - Use descriptive output keys
 - Consider the order of agent execution carefully
 - Test with dry-run mode before using real LLMs
+- Use common model parameters for consistent behavior across agents
 
 ## Troubleshooting
 
 ### Common Configuration Issues:
 
 1. **Invalid YAML syntax**: Use a YAML validator or linter
-2. **Missing model references**: Ensure model names match file names
+2. **Missing model references**: Ensure model names match file names exactly
 3. **Environment variables not set**: Check required variables for your provider
 4. **Provider not found**: Install the correct `langchain-{provider}` package
 5. **Template variable errors**: Ensure all `{variables}` are provided in input

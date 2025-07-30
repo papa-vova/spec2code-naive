@@ -69,9 +69,9 @@ def check_command(args, logger):
             model_config = loader.load_model_config(args.model)
             check_results["model"] = {
                 "name": args.model,
-                "type": model_config._type,
+                "provider": model_config.provider,
                 "model_name": model_config.model_name,
-                "temperature": model_config.temperature,
+                "parameters": model_config.parameters,
                 "status": "valid"
             }
             
