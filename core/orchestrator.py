@@ -99,7 +99,7 @@ class Orchestrator:
                             "agent_name": agent_config.name,
                             "input_mapping": agent_config.input_mapping,
                             "output_key": agent_config.output_key,
-                            "prompt_template": agent_config.prompt_template
+                            "prompt_templates": agent_config.prompt_templates
                         }
                     )
                 
@@ -109,8 +109,8 @@ class Orchestrator:
                 # Prepare input data for this agent
                 agent_input = self._prepare_agent_input(pipeline_data, agent_config)
                 
-                # Execute agent
-                agent_output = agent.execute(agent_input)
+                # Execute agent with specified templates
+                agent_output = self._execute_agent(agent, agent_input, agent_config)
                 
                 # Store agent output
                 pipeline_data["agent_outputs"][agent_config.name] = agent_output
@@ -183,3 +183,73 @@ class Orchestrator:
             return input_data
         else:
             return {"input": input_data}
+    
+    def _execute_agent(self, agent: Agent, agent_input: Dict[str, Any], agent_config) -> Dict[str, Any]:
+        """Execute agent with specified prompt templates and aggregate results."""
+        # Get available templates from agent's prompts config
+        prompts_config = self.config_loader.load_prompts_config(agent_config.name)
+        available_templates = list(prompts_config.prompt_templates.keys())
+        
+        # Use the new method to get normalized template list
+        template_list = agent_config.get_template_names(available_templates)
+        
+        if len(template_list) == 1:
+            # Single template execution
+            return agent.execute(agent_input, template_list[0])
+        
+        # Multiple template execution
+        template_results = []
+        aggregated_output = {
+            "template_results": {},
+            "combined_response": "",
+            "execution_metadata": {
+                "templates_used": template_list,
+                "template_count": len(template_list)
+            }
+        }
+        
+        for template_name in template_list:
+            if self.logger:
+                log_step_start(
+                    self.logger,
+                    agent_config.name,
+                    f"template_{template_name}",
+                    f"Executing {agent_config.name} with template '{template_name}'",
+                    {"template_name": template_name}
+                )
+            
+            # Execute agent with this specific template
+            template_result = agent.execute(agent_input, template_name)
+            
+            # Store individual template result
+            aggregated_output["template_results"][template_name] = template_result["output"]
+            template_results.append(template_result["output"])
+            
+            if self.logger:
+                log_step_complete(
+                    self.logger,
+                    agent_config.name,
+                    f"template_{template_name}",
+                    f"Template '{template_name}' execution completed",
+                    {"template_name": template_name}
+                )
+        
+        # Combine responses (simple concatenation for now)
+        combined_responses = []
+        for i, (template_name, result) in enumerate(aggregated_output["template_results"].items()):
+            if isinstance(result, dict) and "agent_response" in result:
+                combined_responses.append(f"Template '{template_name}': {result['agent_response']}")
+            else:
+                combined_responses.append(f"Template '{template_name}': {str(result)}")
+        
+        aggregated_output["combined_response"] = "\n\n".join(combined_responses)
+        
+        # Return in standard agent output format
+        return {
+            "output": aggregated_output,
+            "metadata": {
+                "agent_name": agent_config.name,
+                "multi_template_execution": True,
+                "templates_executed": template_list
+            }
+        }

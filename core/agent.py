@@ -33,7 +33,7 @@ class Agent:
         """Set logger for this agent instance."""
         self.logger = logger
     
-    def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def execute(self, input_data: Dict[str, Any], template_name: str) -> Dict[str, Any]:
         """
         Execute the agent with given input data.
         
@@ -62,7 +62,7 @@ class Agent:
                 }
             else:
                 # Actual LangChain execution logic
-                output = self._execute_with_langchain(input_data)
+                output = self._execute_template(input_data, template_name)
             
             result = {
                 "output": output,
@@ -89,7 +89,7 @@ class Agent:
                 log_error(self.logger, f"Agent {self.config.name} execution failed: {str(e)}", self.config.name, e)
             raise
     
-    def _execute_with_langchain(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_template(self, input_data: Dict[str, Any], template_name: str) -> Dict[str, Any]:
         """
         Execute the agent using actual LangChain with LLM and prompts.
         
@@ -106,25 +106,28 @@ class Agent:
                 # If input is a dict, convert to string representation
                 input_content = str(input_content)
             
-            # Build the LangChain prompt chain
+            # Build the LangChain prompt chain with proper message types and roles
             messages = []
             
-            # Add system message if available
+            # 1. Add system message (AI instructions/context)
             if hasattr(self.prompts, 'system_message') and self.prompts.system_message:
                 messages.append(SystemMessage(content=self.prompts.system_message))
             
-            # Add human message with input data
+            # 2. Add generic human message template (pipeline context)
             if hasattr(self.prompts, 'human_message_template') and self.prompts.human_message_template:
-                # Format the human message template with input data
-                human_content = self.prompts.human_message_template.format(
-                    decomposed_steps=input_content,
+                generic_human_content = self.prompts.human_message_template.format(
                     input=input_content,
-                    **input_data  # Allow any additional template variables
+                    **input_data  # Allow additional template variables
                 )
-                messages.append(HumanMessage(content=human_content))
-            else:
-                # Fallback: use input directly
-                messages.append(HumanMessage(content=input_content))
+                messages.append(HumanMessage(content=generic_human_content))
+            
+            # 3. Add specific human prompt from prompt_templates (specific request/question)
+            specific_human_content = self._get_template_content(template_name, input_content, input_data)
+            messages.append(HumanMessage(content=specific_human_content))
+            
+            # 4. Add AI message prefix if available (optional AI response starter)
+            if hasattr(self.prompts, 'ai_message_prefix') and self.prompts.ai_message_prefix:
+                messages.append(AIMessage(content=self.prompts.ai_message_prefix))
             
             # Create the chain: LLM + output parser
             output_parser = StrOutputParser()
@@ -159,3 +162,40 @@ class Agent:
                 "error": str(e)
             }
 
+    def _get_template_content(self, template_name: str, input_content: str, input_data: Dict[str, Any]) -> str:
+        """Get the template content from prompt_templates dictionary."""
+        try:
+            # All templates must come from the prompt_templates dictionary
+            if not (hasattr(self.prompts, 'prompt_templates') and self.prompts.prompt_templates):
+                raise ValueError(f"Agent {self.config.name} has no prompt_templates defined")
+            
+            if template_name not in self.prompts.prompt_templates:
+                raise ValueError(f"Template '{template_name}' not found in agent {self.config.name} prompt_templates")
+            
+            template_content = self.prompts.prompt_templates[template_name]
+            
+            # Format the template with input data
+            formatted_content = template_content.format(
+                decomposed_steps=input_content,
+                input=input_content,
+                **input_data  # Allow any additional template variables
+            )
+            
+            return formatted_content
+            
+        except KeyError as e:
+            # Handle missing template variables
+            if self.logger:
+                self.logger.warning(f"Template formatting error: {str(e)}, using input directly", extra={
+                    "component": self.config.name,
+                    "data": {"template_name": template_name, "error": str(e)}
+                })
+            return input_content
+        except Exception as e:
+            # Handle any other template errors
+            if self.logger:
+                self.logger.error(f"Template processing error: {str(e)}, using input directly", extra={
+                    "component": self.config.name,
+                    "data": {"template_name": template_name, "error": str(e)}
+                })
+            return input_content

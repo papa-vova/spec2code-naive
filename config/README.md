@@ -1,6 +1,6 @@
 # Configuration System Guide
 
-This directory contains all configuration files for the spec2code-naive pipeline system. The configuration system is designed to be fully declarative, allowing you to modify system behavior without touching any code.
+This directory contains all configuration files for the spec2code-naive pipeline system. The configuration system supports multi-template execution, always-on validation, and configurable logging without requiring code changes.
 
 ## Configuration Architecture
 
@@ -125,29 +125,46 @@ Let's trace through the actual execution:
 - **`"<any_output_key>"`**: Uses the output from whichever agent wrote to that key
 - **Future**: Could support complex mappings like `"agent_outputs.plan_maker.metadata"`
 
-### 4. Data Structure at Each Agent
+### 4. Multi-Template Execution
 
-When an agent receives input, it gets a JSON structure like:
+Agents support multiple prompt templates with flexible configuration:
+
+```yaml
+# Single template
+prompt_templates: "template_name"
+
+# Multiple templates  
+prompt_templates: ["template1", "template2"]
+
+# Auto-all templates (omit field)
+# prompt_templates: # Uses all available from prompts.yaml
+```
+
+Multi-template output structure:
 ```json
 {
-  "input": <the_mapped_data>
+  "template_results": {
+    "template1": {...},
+    "template2": {...}
+  },
+  "combined_response": "Aggregated results",
+  "execution_metadata": {
+    "templates_used": ["template1", "template2"],
+    "template_count": 2
+  }
 }
 ```
 
-When an agent returns output, it provides:
-```json
-{
-  "output": {
-    "agent_response": "LLM generated text",
-    "processed_input": <original_input>,
-    "agent_type": "agent_name"
-  },
-  "metadata": {
-    "agent_name": "agent_name",
-    "dry_run": false,
-    "input_received": true
-  }
-}
+### 5. Pipeline Settings
+
+```yaml
+settings:
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+```
+
+- **Dry Run**: Always available via `--dry-run` flag
+- **Logging**: Always enabled, level configurable
+- **Validation**: Always enforced at runtime
 ```
 
 ### 5. The Critical Insight

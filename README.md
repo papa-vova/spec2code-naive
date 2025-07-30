@@ -5,11 +5,13 @@ A fully configurable, multi-agent LangChain pipeline system that processes featu
 
 ## Key Features
 - **Unified Agent Architecture**: Single `Agent` class configured entirely through YAML files
+- **Multi-Template Execution**: Agents support multiple prompt templates with result aggregation
 - **Dynamic Model Provider Discovery**: Automatic support for any LangChain provider (OpenAI, Anthropic, Ollama, etc.)
 - **Config-Driven Pipeline**: Sequential agent execution defined by `pipeline.yaml`
+- **Always-On Dry Run**: Built-in dry run support without configuration
+- **Configurable Logging**: Always-enabled JSON logging with adjustable levels
+- **Robust Validation**: Comprehensive configuration validation with clear error messages
 - **JSON I/O Pipeline**: Standardized data passing between agents
-- **Comprehensive Logging**: Structured JSON logging throughout execution
-- **Zero Hardcoded Logic**: Everything configurable via YAML files
 
 ## Directory Structure
 
@@ -125,12 +127,19 @@ python main.py -i sample_input.txt --config-root /path/to/config
 - **Generic Parameters**: Any provider-specific parameters supported through config
 - **Environment Variables**: Secure credential management with `${VAR_NAME}` expansion
 
+### Multi-Template Execution
+- **Template Configuration**: Agents support multiple prompt templates via `prompt_templates` field
+- **Flexible Execution**: Single template, multiple templates, or auto-all available templates
+- **Result Aggregation**: Multi-template results combined with metadata and execution details
+- **Message Types**: Proper LangChain message roles (System, Human, AI) with semantic separation
+
 ### Pipeline Execution Flow
 1. **Input Processing**: Reads feature description from file
-2. **Agent Orchestration**: Executes agents sequentially based on pipeline config
-3. **Data Passing**: JSON output from each agent becomes input for the next
-4. **Logging**: Comprehensive structured logging throughout execution
-5. **Error Handling**: Graceful failure with detailed error messages
+2. **Agent Orchestration**: Executes agents sequentially, each with specified templates
+3. **Template Execution**: Agents run once per template with result aggregation
+4. **Data Passing**: JSON output from each agent becomes input for the next
+5. **Logging**: Comprehensive structured logging throughout execution
+6. **Error Handling**: Graceful failure with detailed error messages
 
 ## Usage
 
