@@ -165,7 +165,6 @@ settings:
 - **Dry Run**: Always available via `--dry-run` flag
 - **Logging**: Always enabled, level configurable
 - **Validation**: Always enforced at runtime
-```
 
 ### 5. The Critical Insight
 
