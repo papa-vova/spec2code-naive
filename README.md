@@ -128,7 +128,7 @@ python main.py -i sample_input.txt --config-root /path/to/config
 - **Environment Variables**: Secure credential management with `${VAR_NAME}` expansion
 
 ### Multi-Template Execution
-- **Template Configuration**: Agents support multiple prompt templates via `prompt_templates` field
+- **Template Configuration**: Agents support multiple human message templates via `prompt_templates` field
 - **Flexible Execution**: Single template, multiple templates, or auto-all available templates
 - **Result Aggregation**: Multi-template results combined with metadata and execution details
 - **Message Types**: Proper LangChain message roles (System, Human, AI) with semantic separation

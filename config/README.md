@@ -1,6 +1,6 @@
 # Configuration System Guide
 
-This directory contains all configuration files for the spec2code-naive pipeline system. The configuration system supports multi-template execution, always-on validation, and configurable logging without requiring code changes.
+This directory contains all configuration files for the spec2code-naive pipeline system. The configuration system supports multi-template execution without requiring code changes.
 
 ## Configuration Architecture
 
@@ -126,27 +126,12 @@ Multi-template output structure:
 }
 ```
 
-### 5. Pipeline Settings
+### 5. Log Level Settings
 
 ```yaml
 settings:
   log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
 ```
-
-- **Dry Run**: Always available via `--dry-run` flag
-- **Logging**: Always enabled, level configurable
-- **Validation**: Always enforced at runtime
-
-### 6. The Critical Insight
-
-The `output_key` creates a **named slot** in the pipeline data that subsequent agents can reference via `input_key`. This creates a **declarative data flow** where:
-
-- You define WHAT data flows WHERE
-- You don't need to hardcode HOW agents connect
-- You can easily reorder, add, or remove agents
-- Each agent's output becomes available to all subsequent agents
-
-This is why the system is so flexible - the pipeline configuration acts as a **data flow graph** that you can modify without touching any code.
 
 ## Configuration Types
 
@@ -176,10 +161,12 @@ pipeline:
     log_level: "INFO"               # DEBUG, INFO, WARNING, ERROR
     
   # Common model parameters (optional)
+  # These parameters are passed to all models, 
+  # and can be overridden in individual model configs
   common_model_parameters:
-    temperature: 0.7                # Applied to all models unless overridden
-    top_p: 1.0                     # Applied to all models unless overridden
-    streaming: false               # Applied to all models unless overridden
+    temperature: 0.7                
+    top_p: 1.0                     
+    streaming: false               
 ```
 
 #### Parameters:
@@ -240,11 +227,11 @@ model_name: "specific_model"       # Provider-specific model name
 parameters:                        # Model-specific parameters (passed directly to LLM)
   temperature: 0.7                 # Randomness (0.0-1.0)
   max_tokens: 2000                 # Maximum response tokens
-  top_p: 1.0                      # Nucleus sampling (0.0-1.0)
+  top_p: 1.0                       # Nucleus sampling (0.0-1.0)
   streaming: false                 # Enable streaming responses
   # Any provider-specific parameters...
 credentials:                       # Authentication/connection parameters
-  api_key: "${ENV_VAR}"           # Environment variable expansion
+  api_key: "${ENV_VAR}"            # Environment variable expansion
   # Any provider-specific credentials...
 ```
 
@@ -252,16 +239,8 @@ credentials:                       # Authentication/connection parameters
 - **`name`**: Unique identifier for this model configuration
 - **`provider`**: LangChain provider name (used for dynamic import: `langchain_{provider}`)
 - **`model_name`**: Specific model name within the provider
-- **`parameters`**: Dict of model-specific parameters - **all parameters are passed directly to the LLM constructor**
+- **`parameters`**: Dict of model-specific parameters (all parameters are passed directly to the LLM constructor)
 - **`credentials`**: Dict of authentication/connection parameters
-
-#### Parameter Pass-Through System:
-The system passes **all parameters** from the model config directly to the LLM constructor. This means:
-- Provider-specific parameters work automatically (e.g., `num_predict` for Ollama)
-- No parameter mapping needed
-- You can add any provider-specific parameter to your model config
-- Common parameters from pipeline config are merged with individual model parameters
-- Individual model parameters take precedence over common parameters
 
 #### Example:
 ```yaml
@@ -390,145 +369,3 @@ prompt_templates:
   simple_plan: |
     Create a basic implementation plan for: {input}
 ```
-
-## Environment Variables
-
-The system supports secure credential management through environment variable expansion:
-
-```yaml
-credentials:
-  api_key: "${OPENAI_API_KEY}"      # Expands to value of OPENAI_API_KEY
-  custom_param: "${CUSTOM_VAR}"     # Expands to value of CUSTOM_VAR
-```
-
-### Required Environment Variables:
-- **OpenAI**: `OPENAI_API_KEY`
-- **Anthropic**: `ANTHROPIC_API_KEY`
-- **Ollama**: Usually none (runs locally)
-
-## Adding New Providers
-
-The system uses dynamic provider discovery, making it easy to add new LangChain providers:
-
-1. **Install the provider package**:
-   ```bash
-   pip install langchain-{provider}
-   ```
-
-2. **Create model configuration**:
-   ```yaml
-   # config/models/new_provider_model.yaml
-   name: "new_provider_model"
-   provider: "new_provider"  # Must match package name
-   model_name: "specific_model"
-   parameters:
-     # Provider-specific parameters
-   credentials:
-     # Provider-specific credentials
-   ```
-
-3. **Reference in agent config**:
-   ```yaml
-   # config/agents/*/agent.yaml
-   llm: "new_provider_model"
-   ```
-
-The system automatically discovers the provider using the naming convention:
-- **Package**: `langchain_{provider}`
-- **Class**: `Chat{Provider}` (title case)
-
-## Adding New Agents
-
-To add a new agent to the pipeline:
-
-1. **Create agent directory**:
-   ```bash
-   mkdir config/agents/new_agent
-   ```
-
-2. **Create agent configuration**:
-   ```yaml
-   # config/agents/new_agent/agent.yaml
-   name: "new_agent"
-   description: "Description of what this agent does"
-   llm: "openai_gpt4"  # Reference to model config
-   ```
-
-3. **Create prompt templates**:
-   ```yaml
-   # config/agents/new_agent/prompts.yaml
-   system_message: |
-     You are a specialized agent that...
-   
-   human_message_template: |
-     Process this input: {input}
-   ```
-
-4. **Add to pipeline**:
-   ```yaml
-   # config/pipeline.yaml
-   agents:
-     # ... existing agents
-     - name: "new_agent"
-       input_key: "previous_output_key"
-       output_key: "new_agent_output"
-   ```
-
-## Configuration Validation
-
-The system includes comprehensive configuration validation:
-
-- **YAML syntax validation**
-- **Required field checking**
-- **Reference validation** (model references, agent names)
-- **Parameter type checking**
-- **Environment variable validation**
-
-Use the CLI tool for validation:
-```bash
-python cli_config.py validate
-```
-
-## Best Practices
-
-### Model Configuration:
-- Use descriptive names for model configs
-- Set reasonable token limits to control costs
-- Use environment variables for all credentials
-- Test with different temperature settings for your use case
-- All parameters are passed directly to the LLM - add any provider-specific parameters
-
-### Agent Configuration:
-- Keep agent names short and descriptive
-- Use clear descriptions for documentation
-- Choose appropriate models for each agent's complexity
-- The `llm` field must exactly match the model config filename
-
-### Prompt Configuration:
-- Write clear, specific system messages
-- Use template variables for flexibility
-- Test prompts with different input types
-- `prompt_templates` are optional - the system falls back to `human_message_template`
-
-### Pipeline Configuration:
-- Design clear data flow between agents
-- Use descriptive output keys
-- Consider the order of agent execution carefully
-- Test with dry-run mode before using real LLMs
-- Use common model parameters for consistent behavior across agents
-
-## Troubleshooting
-
-### Common Configuration Issues:
-
-1. **Invalid YAML syntax**: Use a YAML validator or linter
-2. **Missing model references**: Ensure model names match file names exactly
-3. **Environment variables not set**: Check required variables for your provider
-4. **Provider not found**: Install the correct `langchain-{provider}` package
-5. **Template variable errors**: Ensure all `{variables}` are provided in input
-
-### Debugging Tips:
-- Use `--dry-run` mode to test configuration without LLM calls
-- Check logs for detailed error messages
-- Validate configurations with `python cli_config.py validate`
-- Test individual components before full pipeline runs
