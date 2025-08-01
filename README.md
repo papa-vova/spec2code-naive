@@ -4,7 +4,7 @@ Multi-agent LangChain pipeline that processes input through sequential agent exe
 
 ## How It Works
 
-- Agents execute sequentially as defined in `pipeline.yaml`
+- Agents execute sequentially as defined in the [configuration](config/README.md)
 - Each agent can take input from pipeline input or other agents
 - Multi-input agents supported (agent can read from multiple sources)
 - All configuration via YAML files, no code changes needed
@@ -54,48 +54,4 @@ python test_config.py validate && python test_runtime.py && python main.py -i in
 
 ## Configuration
 
-See `config/README.md` for configuration details.
-
-## Multi-Input Agents
-
-Agents can take input from multiple sources:
-
-```yaml
-agents:
-  - name: "analyzer"
-    inputs: ["pipeline_input"]           # Single input
-  - name: "validator" 
-    inputs: ["analyzer"]                 # Single agent input
-  - name: "combiner"
-    inputs: ["analyzer", "validator"]    # Multi-agent inputs
-```
-
-## Shared Data Structure
-
-Pipeline maintains unified data context:
-
-```json
-{
-  "pipeline_name": "spec2code_pipeline",
-  "execution_successful": true,
-  "pipeline_input": {
-    "content": "...",
-    "source": "input.txt",
-    "size": 1322
-  },
-  "agents": {
-    "agent_name": {
-      "output": { "agent_response": "..." },
-      "metadata": {
-        "execution_time": 0.0,
-        "templates_used": ["template_name"],
-        "input_sources": "pipeline_input"  // or ["agent1", "agent2"]
-      }
-    }
-  },
-  "metadata": {
-    "agent_sequence": ["agent1", "agent2"],
-    "execution_time": 0.0
-  }
-}
-```
+See [config/README.md](config/README.md) for configuration details.

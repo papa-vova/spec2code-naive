@@ -51,7 +51,7 @@ class PromptsConfig(BaseModel):
     system_message: str
     human_message_template: str
     ai_message_prefix: Optional[str] = None
-    prompt_templates: Dict[str, str] = {}
+    prompt_templates: Optional[Union[str, Dict[str, str]]] = None
 
 
 class PipelineAgentConfig(BaseModel):
@@ -61,19 +61,19 @@ class PipelineAgentConfig(BaseModel):
     prompt_templates: Optional[Union[str, List[str]]] = None
     
     def get_template_names(self, available_templates: List[str]) -> List[str]:
-        """Get normalized list of template names based on three valid cases:
-        1. prompt_templates absent/empty → only human_message_template (no additional templates)
-        2. prompt_templates has one unnamed entry → use that single template
-        3. prompt_templates has named entries → use specified templates
+        """Get normalized list of template names based on configuration:
+        1. prompt_templates absent/empty → use all available templates (or empty if none)
+        2. prompt_templates has single string → use that template name
+        3. prompt_templates has list → use specified template names
         """
         if not self.prompt_templates:
-            # Case 1: No prompt_templates → only human_message_template, no additional templates
-            return []
+            # Case 1: No prompt_templates specified → use all available templates
+            return available_templates
         elif isinstance(self.prompt_templates, str):
-            # Case 2: Single template as string
+            # Case 2: Single template name as string
             return [self.prompt_templates]
         else:
-            # Case 3: Multiple templates as list
+            # Case 3: Multiple template names as list
             return self.prompt_templates
 
 
@@ -268,15 +268,25 @@ class ConfigLoader:
         # No validation needed for prompt_templates as it's designed to have multiple options
     
     def get_prompt_template(self, agent_name: str, template_name: str) -> str:
-        """Get a specific prompt template by name."""
+        """Get a specific prompt template by name or content."""
         prompts_config = self.load_prompts_config(agent_name)
         
-        if template_name in prompts_config.prompt_templates:
-            return prompts_config.prompt_templates[template_name]
-        elif template_name == "default":
-            return prompts_config.human_message_template
+        # Handle the three valid cases for prompt_templates
+        if prompts_config.prompt_templates is None:
+            # Case 1: Missing/empty prompt_templates - should not be called for templates
+            raise ConfigValidationError(f"No prompt templates defined for agent '{agent_name}'")
+        elif isinstance(prompts_config.prompt_templates, str):
+            # Case 2: Unnamed template content - this method should never be called for Case 2
+            raise ConfigValidationError(f"Agent '{agent_name}' has unnamed template content. This should be handled directly by the orchestrator, not through template name resolution.")
+        elif isinstance(prompts_config.prompt_templates, dict):
+            # Case 3: Named templates dictionary
+            if template_name in prompts_config.prompt_templates:
+                return prompts_config.prompt_templates[template_name]
+            else:
+                available_templates = list(prompts_config.prompt_templates.keys())
+                raise ConfigValidationError(f"Prompt template '{template_name}' not found for agent '{agent_name}'. Available: {available_templates}")
         else:
-            raise ConfigValidationError(f"Prompt template '{template_name}' not found for agent '{agent_name}'")
+            raise ConfigValidationError(f"Invalid prompt_templates format for agent '{agent_name}'")
     
     def list_available_models(self) -> List[str]:
         """List all available model configurations."""
@@ -305,18 +315,34 @@ class ConfigLoader:
             except ConfigValidationError as e:
                 raise ConfigValidationError(f"Cannot validate pipeline templates for agent '{agent_name}': {e}")
             
-            available_templates = list(prompts_config.prompt_templates.keys())
-            
-            # Get the templates this agent wants to use
-            requested_templates = agent_config.get_template_names(available_templates)
-            
-            # Validate that all requested templates exist in the agent's prompts.yaml
-            for template_name in requested_templates:
-                if template_name not in available_templates:
+            # Handle the three valid cases for prompt_templates
+            if prompts_config.prompt_templates is None:
+                # Case 1: Missing/empty prompt_templates - no additional validation needed
+                # Only human_message_template will be used
+                pass
+            elif isinstance(prompts_config.prompt_templates, str):
+                # Case 2: Unnamed template content - pipeline.yaml should not specify templates
+                # The unnamed template will be used automatically
+                if agent_config.prompt_templates is not None:
                     raise ConfigValidationError(
-                        f"Agent '{agent_name}' in pipeline.yaml references template '{template_name}' "
-                        f"which does not exist in its prompts.yaml. Available templates: {available_templates}"
+                        f"Agent '{agent_name}' has unnamed template content in prompts.yaml, "
+                        f"but pipeline.yaml specifies prompt_templates. For unnamed templates, "
+                        f"leave prompt_templates empty/absent in pipeline.yaml."
                     )
+            elif isinstance(prompts_config.prompt_templates, dict):
+                # Case 3: Named templates dictionary - validate specific template names
+                available_templates = list(prompts_config.prompt_templates.keys())
+                
+                # Get the templates this agent wants to use
+                requested_templates = agent_config.get_template_names(available_templates)
+                
+                # Validate that all requested templates exist
+                for template_name in requested_templates:
+                    if template_name not in available_templates:
+                        raise ConfigValidationError(
+                            f"Agent '{agent_name}' in pipeline.yaml references template '{template_name}' "
+                            f"which does not exist in its prompts.yaml. Available templates: {available_templates}"
+                        )
             
             # Ensure agent has at least one template available in prompts.yaml
             if not available_templates:

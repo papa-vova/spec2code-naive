@@ -123,9 +123,7 @@ class Orchestrator:
                     "output": agent_output["output"],
                     "metadata": {
                         "execution_time": (time.time() - agent_start_time) * 1000,
-                        "templates_used": agent_config.get_template_names(
-                            list(self.config_loader.load_prompts_config(agent_config.name).prompt_templates.keys())
-                        ),
+                        "templates_used": agent_output.get("templates_used", []),
                         "input_sources": input_sources
                     }
                 }
@@ -207,17 +205,25 @@ class Orchestrator:
         """Execute agent with specified prompt templates and aggregate results."""
         # Get available templates from agent's prompts config
         prompts_config = self.config_loader.load_prompts_config(agent_config.name)
-        available_templates = list(prompts_config.prompt_templates.keys())
         
-        # Use the new method to get normalized template list
-        template_list = agent_config.get_template_names(available_templates)
-        
-        if len(template_list) == 0:
-            # Case 1: No prompt_templates → only human_message_template
-            return agent.execute(agent_input, None)  # None indicates no additional template
-        elif len(template_list) == 1:
-            # Case 2: Single template execution
-            return agent.execute(agent_input, template_list[0])
+        # Determine what templates to execute based on prompts.yaml content
+        if prompts_config.prompt_templates is None:
+            # Case 1: Missing/empty prompt_templates - only human_message_template
+            result = agent.execute(agent_input, None)  # None indicates no additional template
+            result["templates_used"] = []
+            return result
+        elif isinstance(prompts_config.prompt_templates, str):
+            # Case 2: Unnamed template content - execute both human_message_template and unnamed content
+            # Execute with the unnamed template content directly
+            result = agent.execute_with_unnamed_template(agent_input, prompts_config.prompt_templates)
+            result["templates_used"] = ["unnamed_template"]
+            return result
+        elif isinstance(prompts_config.prompt_templates, dict):
+            # Case 3: Named templates dictionary - use what's specified in pipeline.yaml
+            available_templates = list(prompts_config.prompt_templates.keys())
+            template_list = agent_config.get_template_names(available_templates)
+        else:
+            template_list = []
         
         # Case 3: Multiple template execution
         aggregated_output = {
@@ -227,6 +233,7 @@ class Orchestrator:
                 "template_count": len(template_list)
             }
         }
+        template_results = []  # Initialize list to collect template outputs
         
         for template_name in template_list:
             if self.logger:
@@ -259,6 +266,7 @@ class Orchestrator:
         # Return in standard agent output format
         return {
             "output": aggregated_output,
+            "templates_used": template_list,
             "metadata": {
                 "agent_name": agent_config.name,
                 "multi_template_execution": True,

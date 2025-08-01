@@ -1,6 +1,6 @@
 # Configuration System Guide
 
-This directory contains all configuration files for the spec2code-naive pipeline system. The configuration system supports multi-template execution without requiring code changes.
+This directory contains all configuration files for the pipeline system. The configuration system supports multi-template execution without requiring code changes.
 
 ## Configuration Architecture
 
@@ -32,17 +32,17 @@ Agents specify inputs as a list of sources:
 ```yaml
 agents:
   - name: "plan_maker"
-    inputs: ["pipeline_input"]              # Single input from pipeline
+    input_sources: ["pipeline_input"]              # Single input from pipeline
   - name: "plan_critique_generator" 
-    inputs: ["plan_maker"]                   # Single input from agent
+    input_sources: ["plan_maker"]                   # Single input from agent
   - name: "plan_critique_comparator"
-    inputs: ["plan_maker", "plan_critique_generator"]  # Multi-input from agents
+    input_sources: ["pipeline_input", "plan_maker", "plan_critique_generator"]  # Multi-input from agents and pipeline
 ```
 
 ### Input Sources
-- `"pipeline_input"`: Original input file content
+- `"pipeline_input"`: Original input content from the pipeline (which comes from stdin or file(s)
 - `"agent_name"`: Output from specified agent
-- Multiple sources: Agent receives combined input
+- Multiple sources: Agent receives combined input from multiple agents or pipeline_input
 
 ### Shared Data Structure
 
@@ -63,7 +63,7 @@ Pipeline maintains unified context:
       "metadata": {
         "execution_time": 0.0,
         "templates_used": ["template_name"],
-        "input_sources": "pipeline_input"  // or ["agent1", "agent2"]
+        "input_sources": "pipeline_input"  // or ["agent1", "agent2"], or ["pipeline_input", "agent1"], etc
       }
     }
   },
@@ -74,32 +74,139 @@ Pipeline maintains unified context:
 }
 ```
 
-### 4. Multi-Template Execution
+### 4. Prompt Templates System
 
-Agents support multiple prompt templates with flexible configuration:
+The system supports three valid cases for `prompt_templates` configuration:
 
+#### Case 1: Missing/Empty Templates (prompts.yaml)
 ```yaml
-# Single template
-prompt_templates: "template_name"
-
-# Multiple templates  
-prompt_templates: ["template1", "template2"]
-
-# Auto-all templates (omit field)
-# prompt_templates: # Uses all available from prompts.yaml
+# prompts.yaml - No prompt_templates defined
+system_message: |
+  You are an agent.
+human_message_template: |
+  Process this: {input}
+# prompt_templates: # Missing or empty
 ```
 
-Multi-template output structure:
+```yaml
+# pipeline.yaml - prompt_templates field can be present but ignored
+agents:
+  - name: "agent_name"
+    input_sources: ["pipeline_input"]
+    # prompt_templates: # Can be omitted or any value - will be ignored
+```
+
+**Result**: Uses only `human_message_template` content. Any template names in pipeline.yaml are ignored since no templates are defined.
+
+#### Case 2: String Content (prompts.yaml)
+```yaml
+# prompts.yaml - String as template content
+system_message: |
+  You are an agent.
+human_message_template: |
+  Process this: {input}
+prompt_templates: |
+  Custom template content with {input} variable.
+  This is the actual template text, not a name reference.
+```
+
+```yaml
+# pipeline.yaml - Must have empty/absent prompt_templates
+agents:
+  - name: "agent_name"
+    input_sources: ["pipeline_input"]
+    # prompt_templates: # Must be omitted or empty for Case 2
+```
+
+**Result**: System automatically instantiates both `human_message_template` and the unnamed template content. `pipeline.yaml` must not specify template names for this case.
+
+#### Case 3: Named Templates Dictionary (prompts.yaml)
+```yaml
+# prompts.yaml - Named templates with content
+system_message: |
+  You are an agent.
+human_message_template: |
+  Process this: {input}
+prompt_templates:
+  with_context: |
+    Create a plan for: {input}
+    Consider existing context.
+  simple_plan: |
+    Create a basic plan for: {input}
+```
+
+```yaml
+# pipeline.yaml - Reference specific template names
+agents:
+  - name: "agent_name"
+    input_sources: ["pipeline_input"]
+    prompt_templates: "with_context"  # Specific template name
+    # OR
+    prompt_templates: ["with_context", "simple_plan"]  # Multiple templates
+    # OR omit field to use all available templates
+```
+
+**Result**: Uses specified named template(s) content.
+
+#### Final Output Structure
+
+**Case 1 - Missing/Empty Templates**:
 ```json
 {
-  "template_results": {
-    "template1": {...},
-    "template2": {...}
-  },
-  "combined_response": "Aggregated results",
-  "execution_metadata": {
-    "templates_used": ["template1", "template2"],
-    "template_count": 2
+  "agents": {
+    "agent_name": {
+      "output": {
+        "agent_response": "Response using human_message_template only"
+      },
+      "metadata": {
+        "execution_time": 123.45,
+        "templates_used": [],  // Empty array - no templates used
+        "input_sources": "pipeline_input"
+      }
+    }
+  }
+}
+```
+
+**Case 2 - String Content**:
+```json
+{
+  "agents": {
+    "agent_name": {
+      "output": {
+        "agent_response": "Response using both human_message_template and unnamed content"
+      },
+      "metadata": {
+        "execution_time": 123.45,
+        "templates_used": ["unnamed_template"],  // Internal identifier for unnamed content
+        "input_sources": "pipeline_input"
+      }
+    }
+  }
+}
+```
+
+**Case 3 - Named Templates Dictionary** (with multiple templates):
+```json
+{
+  "agents": {
+    "agent_name": {
+      "output": {
+        "template_results": {
+          "with_context": {"agent_response": "..."},
+          "simple_plan": {"agent_response": "..."}
+        },
+        "execution_metadata": {
+          "templates_used": ["with_context", "simple_plan"],
+          "template_count": 2
+        }
+      },
+      "metadata": {
+        "execution_time": 123.45,
+        "templates_used": ["with_context", "simple_plan"],
+        "input_sources": "pipeline_input"
+      }
+    }
   }
 }
 ```
@@ -126,8 +233,7 @@ pipeline:
   # Agent execution sequence
   agents:
     - name: "agent_name"              # Must match agent directory name
-      input_key: "data_source"        # Where this agent gets its input
-      output_key: "result_key"        # Key name for this agent's output
+      input_sources: ["data_source"]   # Where this agent gets its input
       prompt_templates: "template"    # Optional: specific template(s) to use
   
   # Execution settings
@@ -152,10 +258,9 @@ pipeline:
 - **`description`**: Human-readable description of pipeline purpose
 - **`agents`**: List of agents to execute in sequence
   - **`name`**: Agent identifier (must match directory in `agents/`)
-  - **`input_key`**: Where this agent gets input data from:
+  - **`input_sources`**: List of where this agent gets input data from:
     - `"pipeline_input"`: Uses the original pipeline input
-    - `"<output_key>"`: Uses output from previous agent with that key
-  - **`output_key`**: Key name for storing this agent's output in pipeline data
+    - `"agent_name"`: Uses output from specified agent
   - **`prompt_templates`**: (Optional) Which prompt template(s) to use
 - **`execution.mode`**: Execution mode (currently only "sequential")
 - **`settings.log_level`**: Logging level (DEBUG, INFO, WARNING, ERROR)
@@ -169,18 +274,15 @@ pipeline:
   
   agents:
     - name: "plan_maker"
-      input_key: "pipeline_input"
-      output_key: "implementation_plan"
+      input_sources: ["pipeline_input"]
       prompt_templates: "with_context"
       
     - name: "plan_critique_generator"
-      input_key: "implementation_plan"
-      output_key: "critique_report"
+      input_sources: ["plan_maker"]
       prompt_templates: "technical_feasibility"
       
     - name: "plan_critique_comparator"
-      input_key: "critique_report"
-      output_key: "comparison_result"
+      input_sources: ["pipeline_input", "plan_maker", "plan_critique_generator"]
   
   execution:
     mode: "sequential"
@@ -302,7 +404,18 @@ human_message_template: |
 ai_message_prefix: |              # Optional: AI message prefix
   Optional prefix for AI responses.
 
-prompt_templates:                 # Optional: Named template variations
+# prompt_templates supports three valid cases:
+
+# Case 1: Missing/empty (uses only human_message_template)
+# prompt_templates: # Omit this field entirely
+
+# Case 2: Single string content (actual template text)
+prompt_templates: |
+  Custom template content with {input} variables.
+  This is actual template text, not a name reference.
+
+# Case 3: Named template variations (dictionary)
+prompt_templates:
   template_name1: |
     Template content with {input} variables.
   template_name2: |
@@ -313,12 +426,14 @@ prompt_templates:                 # Optional: Named template variations
 - **`system_message`**: (Required) System prompt defining agent's role and behavior
 - **`human_message_template`**: (Required) Template for human messages, supports variables like `{input}`
 - **`ai_message_prefix`**: (Optional) Prefix for AI responses
-- **`prompt_templates`**: (Optional) Dict of named template variations for different scenarios
+- **`prompt_templates`**: (Optional) Three valid formats:
+  - **Missing/empty**: Uses only `human_message_template`
+  - **Single string**: Actual template content (not a name reference)
+  - **Dictionary**: Named template variations for different scenarios
 
 ##### Template Variables:
-- **`{input}`**: The main input content
-- **`{decomposed_steps}`**: Alias for input (legacy compatibility)
-- **Any key from input JSON**: Can reference specific input fields
+- **`{input}`**: The main input content (if JSON, this is the string representation of the entire JSON object)
+- **Any JSON key**: If input is JSON, you can reference any key directly (e.g., `{title}`, `{description}`, `{requirements}`)
 
 ##### Example:
 ```yaml

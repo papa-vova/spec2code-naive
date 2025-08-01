@@ -87,6 +87,136 @@ class Agent:
                 log_error(self.logger, f"Agent {self.config.name} execution failed: {str(e)}", self.config.name, e)
             raise
     
+    def execute_with_unnamed_template(self, input_data: Dict[str, Any], unnamed_template_content: str) -> Dict[str, Any]:
+        """
+        Execute the agent with unnamed template content (Case 2).
+        
+        Args:
+            input_data: JSON input data
+            unnamed_template_content: The actual template content string
+            
+        Returns:
+            JSON output data in format: {"output": {...}, "metadata": {...}}
+        """
+        if self.logger:
+            log_step_start(
+                self.logger, 
+                self.config.name, 
+                "execute_unnamed", 
+                f"Starting {self.config.name} execution with unnamed template",
+                {"input_keys": list(input_data.keys())}
+            )
+        
+        try:
+            if self.dry_run:
+                # In dry-run mode, return dummy output based on input
+                output = {
+                    "agent_response": f"DUMMY OUTPUT from {self.config.name} with unnamed template"
+                }
+            else:
+                # Actual LangChain execution logic with unnamed template
+                output = self._execute_with_unnamed_template(input_data, unnamed_template_content)
+            
+            result = {
+                "output": output,
+                "metadata": {
+                    "agent_name": self.config.name,
+                    "dry_run": self.dry_run,
+                    "input_received": True,
+                    "unnamed_template_used": True
+                }
+            }
+            
+            if self.logger:
+                log_step_complete(
+                    self.logger,
+                    self.config.name,
+                    "execute_unnamed", 
+                    f"Completed {self.config.name} execution with unnamed template",
+                    {"output_keys": list(result["output"].keys())}
+                )
+            
+            return result
+            
+        except Exception as e:
+            if self.logger:
+                log_error(self.logger, f"Agent {self.config.name} execution with unnamed template failed: {str(e)}", self.config.name, e)
+            raise
+    
+    def _execute_with_unnamed_template(self, input_data: Dict[str, Any], unnamed_template_content: str) -> Dict[str, Any]:
+        """
+        Execute the agent using LangChain with unnamed template content (Case 2).
+        Instantiates both human_message_template AND the unnamed template content.
+        
+        Args:
+            input_data: JSON input data
+            unnamed_template_content: The actual template content string
+            
+        Returns:
+            Processed output data
+        """
+        try:
+            # Extract the main input content
+            input_content = input_data.get("input", "")
+            if isinstance(input_content, dict):
+                # If input is a dict, convert to string representation
+                input_content = str(input_content)
+            
+            # Build the LangChain prompt chain with proper message types and roles
+            messages = []
+            
+            # 1. Add system message (AI instructions/context)
+            if hasattr(self.prompts, 'system_message') and self.prompts.system_message:
+                messages.append(SystemMessage(content=self.prompts.system_message))
+            
+            # 2. Add human message template (ALWAYS included)
+            if hasattr(self.prompts, 'human_message_template') and self.prompts.human_message_template:
+                human_content = self.prompts.human_message_template.format(
+                    input=input_content,
+                    **input_data  # Allow additional template variables
+                )
+                messages.append(HumanMessage(content=human_content))
+
+            # 3. Add the unnamed template content (Case 2 specific)
+            unnamed_content = unnamed_template_content.format(
+                input=input_content,
+                **input_data  # Allow additional template variables
+            )
+            messages.append(HumanMessage(content=unnamed_content))
+
+            # 4. Add AI message prefix if available (optional AI response starter)
+            if hasattr(self.prompts, 'ai_message_prefix') and self.prompts.ai_message_prefix:
+                messages.append(AIMessage(content=self.prompts.ai_message_prefix))
+
+            # Create the chain: LLM + output parser
+            output_parser = StrOutputParser()
+            chain = self.llm | output_parser
+            
+            # Execute the chain
+            if self.logger:
+                self.logger.debug(f"Executing LangChain for {self.config.name} with unnamed template", extra={
+                    "component": self.config.name,
+                    "data": {"message_count": len(messages)}
+                })
+            
+            response = chain.invoke(messages)
+            
+            # Return structured output
+            return {
+                "agent_response": response,
+                "llm_used": True
+            }
+            
+        except Exception as e:
+            if self.logger:
+                log_error(self.logger, f"LangChain execution with unnamed template failed for {self.config.name}: {str(e)}", self.config.name, e)
+            # Fallback to basic output if LangChain fails
+            return {
+                "agent_response": f"Error in {self.config.name}: {str(e)}",
+                "llm_used": False,
+                "error": str(e)
+            }
+    
     def _execute_template(self, input_data: Dict[str, Any], template_name: str) -> Dict[str, Any]:
         """
         Execute the agent using actual LangChain with LLM and prompts.

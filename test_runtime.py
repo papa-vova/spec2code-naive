@@ -479,14 +479,14 @@ def main():
             log_step_complete(logger, "TestRunner", "runtime_tests", 
                             "All runtime regression tests passed", test_info)
         else:
-            log_error(logger, "Some runtime regression tests failed", "TestRunner", None, test_info)
+            log_error(logger, "Some runtime regression tests failed", "TestRunner", None)
             
             # Log failure details
             for test, traceback in result.failures:
-                log_error(logger, f"Test failure: {test}", "TestRunner", None, {"traceback": traceback})
+                log_error(logger, f"Test failure: {test}", "TestRunner", None)
             
             for test, traceback in result.errors:
-                log_error(logger, f"Test error: {test}", "TestRunner", None, {"traceback": traceback})
+                log_error(logger, f"Test error: {test}", "TestRunner", None)
         
         # Exit with appropriate code for CI/CD
         sys.exit(0 if success else 1)
