@@ -6,7 +6,7 @@ This directory contains all configuration files for the pipeline system. The con
 
 The system uses a hierarchical configuration structure:
 
-```
+```bash
 config/
 ├── pipeline.yaml          # Pipeline orchestration and agent sequence
 ├── models/                # Model provider configurations
