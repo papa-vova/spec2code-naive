@@ -56,9 +56,7 @@ class Agent:
             if self.dry_run:
                 # In dry-run mode, return dummy output based on input
                 output = {
-                    "agent_response": f"DUMMY OUTPUT from {self.config.name}",
-                    "processed_input": input_data.get("input", {}),
-                    "agent_type": self.config.name
+                    "agent_response": f"DUMMY OUTPUT from {self.config.name}"
                 }
             else:
                 # Actual LangChain execution logic
@@ -120,22 +118,19 @@ class Agent:
                     **input_data  # Allow additional template variables
                 )
                 messages.append(HumanMessage(content=human_content))
-        
+
             # 3. Add specific prompt template if available and specified
-            if (hasattr(self.prompts, 'prompt_templates') and 
-                self.prompts.prompt_templates and 
-                template_name in self.prompts.prompt_templates):
-                
+            if template_name is not None and hasattr(self.prompts, 'prompt_templates') and self.prompts.prompt_templates and template_name in self.prompts.prompt_templates:
                 template_content = self.prompts.prompt_templates[template_name].format(
                     input=input_content,
                     **input_data  # Allow additional template variables
                 )
                 messages.append(HumanMessage(content=template_content))
-            
+
             # 4. Add AI message prefix if available (optional AI response starter)
             if hasattr(self.prompts, 'ai_message_prefix') and self.prompts.ai_message_prefix:
                 messages.append(AIMessage(content=self.prompts.ai_message_prefix))
-            
+
             # Create the chain: LLM + output parser
             output_parser = StrOutputParser()
             chain = self.llm | output_parser
@@ -152,8 +147,6 @@ class Agent:
             # Return structured output
             return {
                 "agent_response": response,
-                "processed_input": input_data.get("input", {}),
-                "agent_type": self.config.name,
                 "llm_used": True
             }
             
@@ -163,10 +156,6 @@ class Agent:
             # Fallback to basic output if LangChain fails
             return {
                 "agent_response": f"Error in {self.config.name}: {str(e)}",
-                "processed_input": input_data.get("input", {}),
-                "agent_type": self.config.name,
                 "llm_used": False,
                 "error": str(e)
             }
-
-

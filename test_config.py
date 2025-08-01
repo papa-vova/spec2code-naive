@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """
-CLI tool for managing LangChain agent configurations.
-Validates configs and provides management commands.
+Configuration testing and validation tool for the agent pipeline system.
+
+Provides CLI commands for:
+- Validating all configuration files (syntax, schema, consistency)
+- Listing available models and agents
+- Checking specific agent or model configurations
+- Ensuring config integrity before runtime execution
+
+This tool focuses on STATIC configuration validation, while test_runtime.py
+handles DYNAMIC runtime behavior testing.
 """
 import argparse
 import sys

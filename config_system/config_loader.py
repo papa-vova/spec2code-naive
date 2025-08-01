@@ -57,20 +57,23 @@ class PromptsConfig(BaseModel):
 class PipelineAgentConfig(BaseModel):
     """Configuration for a single agent in the pipeline."""
     name: str
-    input_key: str
-    output_key: str
+    inputs: List[str]  # List of agent names or "pipeline_input"
     prompt_templates: Optional[Union[str, List[str]]] = None
     
     def get_template_names(self, available_templates: List[str]) -> List[str]:
-        """Get normalized list of template names. If None/empty, return all available templates or default."""
+        """Get normalized list of template names based on three valid cases:
+        1. prompt_templates absent/empty → only human_message_template (no additional templates)
+        2. prompt_templates has one unnamed entry → use that single template
+        3. prompt_templates has named entries → use specified templates
+        """
         if not self.prompt_templates:
-            # If missing or empty, use all available templates, or default if none available
-            return available_templates if available_templates else ["default"]
+            # Case 1: No prompt_templates → only human_message_template, no additional templates
+            return []
         elif isinstance(self.prompt_templates, str):
-            # Single template as string
+            # Case 2: Single template as string
             return [self.prompt_templates]
         else:
-            # Already a list
+            # Case 3: Multiple templates as list
             return self.prompt_templates
 
 

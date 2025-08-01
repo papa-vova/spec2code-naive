@@ -25,76 +25,54 @@ config/
         └── prompts.yaml
 ```
 
-## Input-Output Data Flow Mechanism
+## Multi-Input Agent System
 
-The pipeline maintains a **shared data context** that gets built up as each agent executes. Here's exactly how the data flows through the system:
+Agents specify inputs as a list of sources:
 
-### 1. Initial Pipeline Data Structure
-When the pipeline starts, it creates a data context:
-```json
-{
-  "pipeline_input": "Original input text from file",
-  "agent_outputs": {},
-  "execution_metadata": {...}
-}
-```
-
-### 2. Agent Execution and Data Mapping
-
-Each agent in the pipeline config specifies:
-- **`input_key`**: Where to get input data FROM
-- **`output_key`**: Where to store output data TO
-
-Let's trace through the actual execution:
-
-#### Agent 1: plan_maker
 ```yaml
-- name: "plan_maker"
-  input_key: "pipeline_input"      # Gets original input
-  output_key: "implementation_plan"    # Stores result here
+agents:
+  - name: "plan_maker"
+    inputs: ["pipeline_input"]              # Single input from pipeline
+  - name: "plan_critique_generator" 
+    inputs: ["plan_maker"]                   # Single input from agent
+  - name: "plan_critique_comparator"
+    inputs: ["plan_maker", "plan_critique_generator"]  # Multi-input from agents
 ```
 
-**Execution:**
-1. Agent gets input: `pipeline_data["pipeline_input"]` 
-2. Agent processes and returns: `{"output": {...}, "metadata": {...}}`
-3. System stores:
-   - `pipeline_data["agent_outputs"]["plan_maker"] = full_agent_response`
-   - `pipeline_data["implementation_plan"] = agent_response["output"]`
+### Input Sources
+- `"pipeline_input"`: Original input file content
+- `"agent_name"`: Output from specified agent
+- Multiple sources: Agent receives combined input
 
-**Pipeline data after Agent 1:**
+### Shared Data Structure
+
+Pipeline maintains unified context:
+
 ```json
 {
-  "pipeline_input": "Original input text",
-  "implementation_plan": {
-    "agent_response": "Generated implementation plan...",
-    "processed_input": {...},
-    "agent_type": "plan_maker"
+  "pipeline_name": "spec2code_pipeline",
+  "execution_successful": true,
+  "pipeline_input": {
+    "content": "...",
+    "source": "input.txt",
+    "size": 1322
   },
-  "agent_outputs": {
-    "plan_maker": {"output": {...}, "metadata": {...}}
+  "agents": {
+    "agent_name": {
+      "output": { "agent_response": "..." },
+      "metadata": {
+        "execution_time": 0.0,
+        "templates_used": ["template_name"],
+        "input_sources": "pipeline_input"  // or ["agent1", "agent2"]
+      }
+    }
+  },
+  "metadata": {
+    "agent_sequence": ["agent1", "agent2"],
+    "execution_time": 0.0
   }
 }
 ```
-
-#### Agent 2: plan_critique_generator
-```yaml
-- name: "plan_critique_generator"
-  input_key: "implementation_plan"  # Gets previous agent's output
-  output_key: "critique_report"         # Stores result here
-```
-
-**Execution:**
-1. Agent gets input: `pipeline_data["implementation_plan"]` (from Agent 1)
-2. Agent processes and returns: `{"output": {...}, "metadata": {...}}`
-3. System stores:
-   - `pipeline_data["agent_outputs"]["plan_critique_generator"] = full_agent_response`
-   - `pipeline_data["critique_report"] = agent_response["output"]`
-
-### 3. Key Input Key Options
-
-- **`"pipeline_input"`**: Uses the original input text from the file
-- **`"<any_output_key>"`**: Uses the output from whichever agent wrote to that key
-- **Future**: Could support complex mappings like `"agent_outputs.plan_maker.metadata"`
 
 ### 4. Multi-Template Execution
 

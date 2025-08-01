@@ -73,13 +73,12 @@ class Orchestrator:
                 }
             )
         
-        # Initialize pipeline data storage
+        # Initialize pipeline data storage with unified structure
+        pipeline_start_time = time.time()
         pipeline_data = {
             "pipeline_input": input_data,  # Store original input
-            "agent_outputs": {},  # Store outputs from each agent
-            "execution_metadata": {
-                "pipeline_name": self.pipeline_config.name,
-                "dry_run": self.dry_run,
+            "agents": {},  # Store each agent's output and metadata
+            "metadata": {
                 "agent_sequence": [agent.name for agent in self.pipeline_config.agents]
             }
         }
@@ -97,8 +96,7 @@ class Orchestrator:
                         f"Executing agent {i+1}/{len(self.pipeline_config.agents)}: {agent_config.name}",
                         {
                             "agent_name": agent_config.name,
-                            "input_key": agent_config.input_key,
-                            "output_key": agent_config.output_key,
+                            "input_sources": agent_config.inputs,
                             "prompt_templates": agent_config.prompt_templates
                         }
                     )
@@ -112,11 +110,26 @@ class Orchestrator:
                 # Execute agent with specified templates
                 agent_output = self._execute_agent(agent, agent_input, agent_config)
                 
-                # Store agent output
-                pipeline_data["agent_outputs"][agent_config.name] = agent_output
-                pipeline_data[agent_config.output_key] = agent_output["output"]
+                # Store agent output in unified structure
+                # Determine input sources format: 
+                # - String "pipeline_input" only if SOLE input is pipeline_input
+                # - Array for all other cases (multiple agents, or mixed pipeline_input + agents)
+                if len(agent_config.inputs) == 1 and agent_config.inputs[0] == "pipeline_input":
+                    input_sources = "pipeline_input"  # String for sole pipeline input
+                else:
+                    input_sources = agent_config.inputs  # Array for multiple/mixed inputs
                 
-                agent_duration = (time.time() - agent_start_time) * 1000
+                pipeline_data["agents"][agent_config.name] = {
+                    "output": agent_output["output"],
+                    "metadata": {
+                        "execution_time": (time.time() - agent_start_time) * 1000,
+                        "templates_used": agent_config.get_template_names(
+                            list(self.config_loader.load_prompts_config(agent_config.name).prompt_templates.keys())
+                        ),
+                        "input_sources": input_sources
+                    }
+                }
+                
                 if self.logger:
                     log_step_complete(
                         self.logger,
@@ -127,16 +140,19 @@ class Orchestrator:
                             "agent_name": agent_config.name,
                             "output_keys": list(agent_output["output"].keys()) if isinstance(agent_output["output"], dict) else ["scalar"]
                         },
-                        agent_duration
+                        pipeline_data["agents"][agent_config.name]["metadata"]["execution_time"]
                     )
             
             # Prepare final result
+            total_execution_time = (time.time() - pipeline_start_time) * 1000
+            pipeline_data["metadata"]["execution_time"] = total_execution_time
+        
             final_result = {
                 "pipeline_name": self.pipeline_config.name,
                 "execution_successful": True,
-                "final_output": pipeline_data[self.pipeline_config.agents[-1].output_key],
-                "all_outputs": {agent.output_key: pipeline_data[agent.output_key] for agent in self.pipeline_config.agents},
-                "metadata": pipeline_data["execution_metadata"]
+                "pipeline_input": pipeline_data["pipeline_input"],
+                "agents": pipeline_data["agents"],
+                "metadata": pipeline_data["metadata"]
             }
             
             if self.logger:
@@ -146,8 +162,7 @@ class Orchestrator:
                     "pipeline_execution",
                     f"Pipeline '{self.pipeline_config.name}' completed successfully",
                     {
-                        "agents_executed": len(self.pipeline_config.agents),
-                        "final_output_type": type(final_result["final_output"]).__name__
+                        "agents_executed": len(self.pipeline_config.agents)
                     }
                 )
             
@@ -166,23 +181,27 @@ class Orchestrator:
         return agent
     
     def _prepare_agent_input(self, pipeline_data: Dict[str, Any], agent_config) -> Dict[str, Any]:
-        """Prepare input data for an agent based on its input mapping."""
-        input_key = agent_config.input_key
-        
-        if input_key == "pipeline_input":
-            # Use the original pipeline input
-            input_data = pipeline_data["pipeline_input"]
-        elif input_key in pipeline_data:
-            # Use output from a previous agent
-            input_data = pipeline_data[input_key]
+        """Prepare input data for an agent based on its input sources."""
+        if len(agent_config.inputs) == 1:
+            # Single input - put directly in "input" key
+            input_source = agent_config.inputs[0]
+            if input_source == "pipeline_input":
+                return {"input": pipeline_data["pipeline_input"]}
+            elif input_source in pipeline_data["agents"]:
+                return {"input": pipeline_data["agents"][input_source]["output"]}
+            else:
+                raise PipelineError(f"Invalid input source '{input_source}' for agent '{agent_config.name}'")
         else:
-            raise PipelineError(f"Invalid input key '{input_key}' for agent '{agent_config.name}'")
-        
-        # Wrap in standard format if it's not already
-        if isinstance(input_data, dict) and "input" in input_data:
-            return input_data
-        else:
-            return {"input": input_data}
+            # Multiple inputs - create dict with agent names as keys
+            agent_input = {}
+            for input_source in agent_config.inputs:
+                if input_source == "pipeline_input":
+                    agent_input[input_source] = pipeline_data["pipeline_input"]
+                elif input_source in pipeline_data["agents"]:
+                    agent_input[input_source] = pipeline_data["agents"][input_source]["output"]
+                else:
+                    raise PipelineError(f"Invalid input source '{input_source}' for agent '{agent_config.name}'")
+            return {"input": agent_input}
     
     def _execute_agent(self, agent: Agent, agent_input: Dict[str, Any], agent_config) -> Dict[str, Any]:
         """Execute agent with specified prompt templates and aggregate results."""
@@ -193,15 +212,16 @@ class Orchestrator:
         # Use the new method to get normalized template list
         template_list = agent_config.get_template_names(available_templates)
         
-        if len(template_list) == 1:
-            # Single template execution
+        if len(template_list) == 0:
+            # Case 1: No prompt_templates → only human_message_template
+            return agent.execute(agent_input, None)  # None indicates no additional template
+        elif len(template_list) == 1:
+            # Case 2: Single template execution
             return agent.execute(agent_input, template_list[0])
         
-        # Multiple template execution
-        template_results = []
+        # Case 3: Multiple template execution
         aggregated_output = {
             "template_results": {},
-            "combined_response": "",
             "execution_metadata": {
                 "templates_used": template_list,
                 "template_count": len(template_list)
@@ -234,15 +254,7 @@ class Orchestrator:
                     {"template_name": template_name}
                 )
         
-        # Combine responses (simple concatenation for now)
-        combined_responses = []
-        for i, (template_name, result) in enumerate(aggregated_output["template_results"].items()):
-            if isinstance(result, dict) and "agent_response" in result:
-                combined_responses.append(f"Template '{template_name}': {result['agent_response']}")
-            else:
-                combined_responses.append(f"Template '{template_name}': {str(result)}")
-        
-        aggregated_output["combined_response"] = "\n\n".join(combined_responses)
+
         
         # Return in standard agent output format
         return {
