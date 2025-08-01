@@ -23,3 +23,6 @@ pipeline:
   # Pipeline-level settings
   settings:
     log_level: "INFO"
+    # Run management settings
+    create_run_artifacts: true
+    runs_directory: "runs"

@@ -8,6 +8,7 @@ import argparse
 import time
 from typing import List, Dict, Any
 from core.orchestrator import Orchestrator
+from core.run_manager import RunManager
 from exceptions import PipelineError, InputError, FileNotFoundError, EmptyFileError
 from logging_config import setup_pipeline_logging, log_step_start, log_step_complete, log_debug, log_error
 
@@ -24,31 +25,68 @@ class Pipeline:
         # Initialize orchestrator
         try:
             self.orchestrator = Orchestrator(config_root, dry_run)
+            
+            # Initialize run manager based on pipeline settings
+            pipeline_config = self.orchestrator.pipeline_config
+            self.run_manager = RunManager(
+                runs_directory=pipeline_config.settings.runs_directory,
+                create_artifacts=pipeline_config.settings.create_run_artifacts
+            )
         except Exception as e:
             raise PipelineError(f"Failed to initialize orchestrator: {e}")
     
     def set_logger(self, logger):
         """Set the logger for this pipeline instance."""
         self.logger = logger
-        # Also set logger on orchestrator
+        # Also set logger on orchestrator and run manager
         if hasattr(self, 'orchestrator'):
             self.orchestrator.set_logger(logger)
+        if hasattr(self, 'run_manager'):
+            self.run_manager.set_logger(logger)
     
-    def run_pipeline(self, input_description: str) -> Dict[str, Any]:
+    def run_pipeline(self, input_description: str, input_file: str = None) -> Dict[str, Any]:
         """
         Execute the pipeline using the config-driven orchestrator.
         
         Args:
-            input_description: Free text description of what should be done
+            input_description: File content that was read from the input file
+            input_file: Source file path (for metadata tracking)
             
         Returns:
-            Dictionary containing the orchestrator result
+            Dictionary containing the orchestrator result with run_id
         """
-        # Prepare input data for orchestrator
-        input_data = {"description": input_description}
+        # Generate unique run ID
+        run_id = self.run_manager.generate_run_id()
+        
+        # Prepare input data for orchestrator with proper structure
+        input_data = {
+            "content": input_description,
+            "source": os.path.basename(input_file),
+            "size": len(input_description)
+        }
         
         # Execute pipeline using orchestrator
-        return self.orchestrator.execute_pipeline(input_data)
+        result = self.orchestrator.execute_pipeline(input_data)
+        
+        # Add run ID to result
+        result["run_id"] = run_id
+        
+        # Save run artifacts if enabled
+        if self.run_manager.create_artifacts:
+            self.run_manager.save_run_result(
+                run_id=run_id,
+                result=result,
+                config_root=self.config_root,
+                input_file=input_file
+            )
+            
+            if self.logger:
+                log_debug(self.logger, f"Run artifacts saved for run ID: {run_id}", "Pipeline", {
+                    "run_id": run_id,
+                    "runs_directory": self.run_manager.runs_directory
+                })
+        
+        return result
 
 
 def main():
@@ -84,6 +122,8 @@ def main():
             action='store_true',
             help='Run pipeline with dummy responses (no LLM required)'
         )
+        
+
         
         args = parser.parse_args()
         input_file = args.input
@@ -129,19 +169,23 @@ def main():
                 "component": "Main",
                 "data": {"mode": "dry_run"}
             })
-        results = pipeline.run_pipeline(input_description)
+        results = pipeline.run_pipeline(input_description, input_file)
         
         # TODO: Generate artifacts (files, reports, etc.) instead of console output
         # For now, the application runs silently and relies on JSON logs for monitoring
         
-        # Log completion
+        # Log completion with run ID
+        run_id = results.get('run_id', 'unknown')
         logger.info("Pipeline execution completed successfully", extra={
             "component": "Main",
             "data": {
                 "execution_successful": results.get('execution_successful', True),
-                "pipeline_name": results.get('pipeline_name', 'unknown')
+                "pipeline_name": results.get('pipeline_name', 'unknown'),
+                "run_id": run_id
             }
         })
+        
+
         
     except (FileNotFoundError, EmptyFileError, InputError) as e:
         if 'logger' in locals():

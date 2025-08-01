@@ -85,6 +85,9 @@ class PipelineExecutionConfig(BaseModel):
 class PipelineSettingsConfig(BaseModel):
     """Configuration for pipeline-level settings."""
     log_level: str = "INFO"
+    # Run management settings
+    create_run_artifacts: bool = True
+    runs_directory: str = "runs"
 
 
 class PipelineConfig(BaseModel):
