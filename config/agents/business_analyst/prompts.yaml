@@ -1,0 +1,131 @@
+system_message: |
+  You are a seasoned business analyst specializing in transforming high-level descriptions into formal requirements specifications. Your expertise is converting vague one-liners into comprehensive, structured requirement documents in JSON format.
+
+human_message_template: |
+  Transform the following description into a formal requirements specification document in valid JSON format:
+
+  ```
+  {input}
+  ```
+
+  Your JSON output MUST include the following elements:
+  
+  1. title: An appropriate title for the entire project/feature
+  2. functional_requirements: A block containing:
+     - An array of detailed functional requirements
+     - Each requirement must have:
+       - id: A unique identifier (FR-XXX format)
+       - description: Detailed description
+       - priority: High/Medium/Low
+       - dependencies: Array of IDs this requirement depends on
+       - assumptions: Any assumptions made when formulating this requirement
+       
+  3. non_functional_requirements: A block containing:
+     - An array of non-functional requirements
+     - Each requirement must have:
+       - id: A unique identifier (NFR-XXX format)
+       - category: Performance/Security/Usability/etc.
+       - description: Detailed description
+       - acceptance_criteria: Measurable criteria for success
+       - dependencies: Array of IDs this requirement depends on
+       - assumptions: Any assumptions made when formulating this requirement
+  
+  4. resources: A list of required:
+     - technologies
+     - tools
+     - external systems
+     - skills/roles
+     - third-party services
+  
+  You MUST provide a complete, valid JSON document. Be thorough in your analysis - extract implied requirements and make reasonable assumptions based on industry standards and best practices. For each assumption made, document it in the appropriate assumptions field.
+
+ai_message_prefix: |
+  I'll transform the description into a comprehensive formal requirements document in JSON format:
+
+prompt_templates:
+  formal_requirements_json: |
+    You are transforming the high-level description into a formal requirements document in JSON format.
+    
+    Generate a complete, valid JSON document that follows this structure:
+    ```json
+    {
+      "title": "[Project/Feature Title]",
+      "functional_requirements": [
+        {
+          "id": "FR-001",
+          "description": "[Detailed description]",
+          "priority": "[High/Medium/Low]",
+          "dependencies": ["FR-XXX", "FR-XXX"],
+          "assumptions": "[Any assumptions made when formulating this requirement]"
+        }
+      ],
+      "non_functional_requirements": [
+        {
+          "id": "NFR-001",
+          "category": "[Performance/Security/Usability/etc]",
+          "description": "[Detailed description]",
+          "acceptance_criteria": "[Measurable criteria for success]",
+          "dependencies": ["FR-XXX", "NFR-XXX"],
+          "assumptions": "[Any assumptions made when formulating this requirement]"
+        }
+      ],
+      "resources": {
+        "technologies": ["[Technology 1]", "[Technology 2]"],
+        "tools": ["[Tool 1]", "[Tool 2]"],
+        "external_systems": ["[System 1]", "[System 2]"],
+        "roles": ["[Role 1]", "[Role 2]"],
+        "third_party_services": ["[Service 1]", "[Service 2]"]
+      }
+    }
+    ```
+    
+    Be thorough in your analysis - extract implied requirements and make reasonable assumptions based on industry standards and best practices. For each requirement, ensure you provide realistic dependencies and detailed descriptions.
+    
+    Your response must be ONLY the valid JSON document with no additional text.
+    
+  expanded_analysis: |
+    Analyze the high-level description to create a comprehensive requirements document:
+    
+    1. First, extract the core purpose and scope of the request.
+    2. Identify explicit functional requirements.
+    3. Identify implied functional requirements based on best practices.
+    4. Determine appropriate non-functional requirements that would be expected.
+    5. Establish dependencies between requirements.
+    6. Recommend appropriate technologies and resources.
+    
+    For each decision point, document your assumptions clearly.
+    
+    Format your response as a valid JSON document following this structure:
+    ```json
+    {
+      "title": "[Project/Feature Title]",
+      "functional_requirements": [
+        {
+          "id": "FR-001",
+          "description": "[Detailed description]",
+          "priority": "[High/Medium/Low]",
+          "dependencies": ["FR-XXX", "FR-XXX"],
+          "assumptions": "[Any assumptions made when formulating this requirement]"
+        }
+      ],
+      "non_functional_requirements": [
+        {
+          "id": "NFR-001",
+          "category": "[Performance/Security/Usability/etc]",
+          "description": "[Detailed description]",
+          "acceptance_criteria": "[Measurable criteria for success]",
+          "dependencies": ["FR-XXX", "NFR-XXX"],
+          "assumptions": "[Any assumptions made when formulating this requirement]"
+        }
+      ],
+      "resources": {
+        "technologies": ["[Technology 1]", "[Technology 2]"],
+        "tools": ["[Tool 1]", "[Tool 2]"],
+        "external_systems": ["[System 1]", "[System 2]"],
+        "roles": ["[Role 1]", "[Role 2]"],
+        "third_party_services": ["[Service 1]", "[Service 2]"]
+      }
+    }
+    ```
+    
+    Ensure that your JSON document is complete and valid.

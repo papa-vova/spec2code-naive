@@ -1,28 +1,15 @@
 pipeline:
-  name: "spec2code_pipeline"
-  description: "Main pipeline for generating implementation plans from feature descriptions"
+  name: "requirements_generator_pipeline"
+  description: "Pipeline for generating formal requirements JSON documents from brief descriptions"
   
-  # Sequential execution of agents
   agents:
-    - name: "plan_maker"
-      inputs: ["pipeline_input"]  # Takes the initial pipeline input
-      prompt_templates: "with_context"  # Use with_context template from prompts.yaml
-      
-    - name: "plan_critique_generator"
-      inputs: ["plan_maker"]  # Takes output from plan_maker agent
-      prompt_templates: "technical_feasibility"  # Use technical_feasibility template from prompts.yaml
-      
-    - name: "plan_critique_comparator"
-      inputs: ["plan_maker", "plan_critique_generator"]  # Takes outputs from both previous agents
-      prompt_templates: "detailed_comparison"  # Use detailed_comparison template from prompts.yaml
+    - name: "business_analyst"
+      inputs: ["pipeline_input"]
   
-  # Execution settings
   execution:
-    mode: "sequential"  # Future: could be "parallel"
+    mode: "sequential"
     
-  # Pipeline-level settings
   settings:
     log_level: "INFO"
-    # Run management settings
     create_run_artifacts: true
     runs_directory: "runs"

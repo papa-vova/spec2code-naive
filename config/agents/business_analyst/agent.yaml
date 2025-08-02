@@ -1,0 +1,3 @@
+name: "business_analyst"
+description: "Business analyst, turns high level descriptions into formal requirements"
+llm: "openai_o4"
