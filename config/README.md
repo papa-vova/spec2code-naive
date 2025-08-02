@@ -349,42 +349,18 @@ Defines agent metadata, model reference, and LangChain-specific settings.
 name: "agent_name"
 description: "Agent purpose description"
 llm: "model_config_name"           # Must match filename in models/ directory
-tools:                             # Optional: Tool configurations
-  - name: "tool_name"
-    description: "Tool description"
-    _type: "tool_type"
-    # Tool-specific parameters...
-memory:                            # Optional: Memory configuration
-  _type: "memory_type"
-  max_token_limit: 2000
-agent_type: "agent_type"           # Optional: LangChain agent type
-max_iterations: 3                  # Optional: Maximum execution iterations
-early_stopping_method: "generate"  # Optional: Stopping method
 ```
 
 ##### Parameters:
 - **`name`**: Agent identifier (should match directory name)
 - **`description`**: Human-readable description of agent purpose
 - **`llm`**: Reference to model configuration name (must exactly match a file in `models/` directory)
-- **`tools`**: (Optional) List of tool configurations for the agent
-- **`memory`**: (Optional) Memory configuration for the agent
-- **`agent_type`**: (Optional) LangChain agent type (default: "zero-shot-react-description")
-- **`max_iterations`**: (Optional) Maximum execution iterations (default: 3)
-- **`early_stopping_method`**: (Optional) Early stopping method (default: "generate")
 
 ##### Example:
 ```yaml
 name: "plan_maker"
 description: "Creates detailed implementation plans from decomposed steps"
 llm: "openai_gpt4"
-tools:
-  - name: "file_reader"
-    description: "Read context files for planning"
-    _type: "file_reader"
-    base_path: "./context"
-memory:
-  _type: "buffer"
-  max_token_limit: 2000
 ```
 
 #### 3.2. Prompt Configuration (`agents/*/prompts.yaml`)
