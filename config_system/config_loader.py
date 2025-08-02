@@ -20,18 +20,7 @@ class ModelConfig(BaseModel):
     credentials: Dict[str, str] = {}  # Generic credentials like api_key, etc.
 
 
-class ToolConfig(BaseModel):
-    """Configuration for LangChain tools."""
-    name: str
-    description: str
-    _type: str
-    base_path: Optional[str] = None
-
-
-class MemoryConfig(BaseModel):
-    """Configuration for LangChain memory."""
-    _type: str = "buffer"
-    max_token_limit: int = 2000
+# ToolConfig and MemoryConfig classes removed as they are no longer used
 
 
 class AgentConfig(BaseModel):
@@ -39,11 +28,6 @@ class AgentConfig(BaseModel):
     name: str
     description: str
     llm: str
-    tools: List[ToolConfig]
-    memory: MemoryConfig
-    agent_type: str = "zero-shot-react-description"
-    max_iterations: int = 3
-    early_stopping_method: str = "generate"
 
 
 class PromptsConfig(BaseModel):

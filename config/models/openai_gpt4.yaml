@@ -1,5 +1,5 @@
 name: "openai_gpt4"
-provider: "openai"
+provider: "OpenAI"
 model_name: "gpt-4"
 parameters:
   temperature: 0.7

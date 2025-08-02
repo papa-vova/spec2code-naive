@@ -48,35 +48,35 @@ prompt_templates:
     
     Generate a complete, valid JSON document that follows this structure:
     ```json
-    {
+    {{
       "title": "[Project/Feature Title]",
       "functional_requirements": [
-        {
+        {{
           "id": "FR-001",
           "description": "[Detailed description]",
           "priority": "[High/Medium/Low]",
           "dependencies": ["FR-XXX", "FR-XXX"],
           "assumptions": "[Any assumptions made when formulating this requirement]"
-        }
+        }}
       ],
       "non_functional_requirements": [
-        {
+        {{
           "id": "NFR-001",
           "category": "[Performance/Security/Usability/etc]",
           "description": "[Detailed description]",
           "acceptance_criteria": "[Measurable criteria for success]",
           "dependencies": ["FR-XXX", "NFR-XXX"],
           "assumptions": "[Any assumptions made when formulating this requirement]"
-        }
+        }}
       ],
-      "resources": {
+      "resources": {{
         "technologies": ["[Technology 1]", "[Technology 2]"],
         "tools": ["[Tool 1]", "[Tool 2]"],
         "external_systems": ["[System 1]", "[System 2]"],
         "roles": ["[Role 1]", "[Role 2]"],
         "third_party_services": ["[Service 1]", "[Service 2]"]
-      }
-    }
+      }}
+    }}
     ```
     
     Be thorough in your analysis - extract implied requirements and make reasonable assumptions based on industry standards and best practices. For each requirement, ensure you provide realistic dependencies and detailed descriptions.
@@ -97,35 +97,35 @@ prompt_templates:
     
     Format your response as a valid JSON document following this structure:
     ```json
-    {
+    {{
       "title": "[Project/Feature Title]",
       "functional_requirements": [
-        {
+        {{
           "id": "FR-001",
           "description": "[Detailed description]",
           "priority": "[High/Medium/Low]",
           "dependencies": ["FR-XXX", "FR-XXX"],
           "assumptions": "[Any assumptions made when formulating this requirement]"
-        }
+        }}
       ],
       "non_functional_requirements": [
-        {
+        {{
           "id": "NFR-001",
           "category": "[Performance/Security/Usability/etc]",
           "description": "[Detailed description]",
           "acceptance_criteria": "[Measurable criteria for success]",
           "dependencies": ["FR-XXX", "NFR-XXX"],
           "assumptions": "[Any assumptions made when formulating this requirement]"
-        }
+        }}
       ],
-      "resources": {
+      "resources": {{
         "technologies": ["[Technology 1]", "[Technology 2]"],
         "tools": ["[Tool 1]", "[Tool 2]"],
         "external_systems": ["[System 1]", "[System 2]"],
         "roles": ["[Role 1]", "[Role 2]"],
         "third_party_services": ["[Service 1]", "[Service 2]"]
-      }
-    }
+      }}
+    }}
     ```
     
     Ensure that your JSON document is complete and valid.

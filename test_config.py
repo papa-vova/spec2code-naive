@@ -86,13 +86,24 @@ def check_command(args, logger):
         if args.agent:
             agent_config = loader.load_agent_config(args.agent)
             prompts_config = loader.load_prompts_config(args.agent)
+            # Get template count based on the three valid formats
+            if prompts_config.prompt_templates is None:
+                # Case 1: Missing/empty - no templates
+                template_count = 0
+            elif isinstance(prompts_config.prompt_templates, str):
+                # Case 2: Unnamed template content - count as 1
+                template_count = 1
+            elif isinstance(prompts_config.prompt_templates, dict):
+                # Case 3: Named templates dictionary
+                template_count = len(prompts_config.prompt_templates)
+            else:
+                template_count = 0
+                
             check_results["agent"] = {
                 "name": args.agent,
                 "description": agent_config.description,
                 "llm": agent_config.llm,
-                "tools_count": len(agent_config.tools),
-                "agent_type": agent_config.agent_type,
-                "prompt_templates_count": len(prompts_config.prompt_templates),
+                "prompt_templates_count": template_count,
                 "status": "valid"
             }
         

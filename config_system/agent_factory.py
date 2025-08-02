@@ -18,11 +18,13 @@ class ModelRegistry:
     def create_llm(cls, model_config: ModelConfig) -> BaseLanguageModel:
         """Create an LLM instance from model configuration using dynamic discovery."""
         try:
-            # Dynamic import using naming convention: langchain_{provider}
-            module = importlib.import_module(f"langchain_{model_config.provider}")
+            # Package import must be lowercase
+            provider_lowercase = model_config.provider.lower()
+            module = importlib.import_module(f"langchain_{provider_lowercase}")
             
-            # Dynamic class discovery using naming convention: Chat{Provider}
-            class_name = f"Chat{model_config.provider.title()}"
+            # Class name uses the provider name as given in config
+            class_name = f"Chat{model_config.provider}"
+            
             llm_class = getattr(module, class_name)
             
             # Create LLM instance with generic parameter handling
@@ -31,12 +33,12 @@ class ModelRegistry:
         except ImportError as e:
             raise ConfigValidationError(
                 f"Model provider '{model_config.provider}' requires additional dependencies. "
-                f"Install with: pip install langchain-{model_config.provider}\n"
+                f"Install with: pip install langchain-{provider_lowercase}\n"
                 f"Error: {str(e)}"
             )
         except AttributeError as e:
             raise ConfigValidationError(
-                f"Provider '{model_config.provider}' does not have expected class 'Chat{model_config.provider.title()}'. "
+                f"Provider '{model_config.provider}' does not have expected class '{class_name}'. "
                 f"Error: {str(e)}"
             )
         except Exception as e:

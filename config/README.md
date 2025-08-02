@@ -302,7 +302,7 @@ Defines LLM model providers, parameters, and credentials. The system uses dynami
 #### Generic Structure:
 ```yaml
 name: "model_identifier"
-provider: "provider_name"          # LangChain provider (e.g., "openai", "anthropic", "ollama")
+provider: "provider_name"          # LangChain provider (e.g., "OpenAI")
 model_name: "specific_model"       # Provider-specific model name
 parameters:                        # Model-specific parameters (passed directly to LLM)
   temperature: 0.7                 # Randomness (0.0-1.0)
@@ -317,7 +317,7 @@ credentials:                       # Authentication/connection parameters
 
 #### Parameters:
 - **`name`**: Unique identifier for this model configuration
-- **`provider`**: LangChain provider name (used for dynamic import: `langchain_{provider}`)
+- **`provider`**: LangChain provider name (e.g., "OpenAI", case is important)
 - **`model_name`**: Specific model name within the provider
 - **`parameters`**: Dict of model-specific parameters (all parameters are passed directly to the LLM constructor)
 - **`credentials`**: Dict of authentication/connection parameters
@@ -325,7 +325,7 @@ credentials:                       # Authentication/connection parameters
 #### Example:
 ```yaml
 name: "openai_gpt4"
-provider: "openai"
+provider: "OpenAI"
 model_name: "gpt-4"
 parameters:
   temperature: 0.7

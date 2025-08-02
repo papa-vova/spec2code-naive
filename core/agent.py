@@ -6,7 +6,7 @@ import json
 from typing import Dict, Any, Optional
 from langchain_core.language_models.base import BaseLanguageModel
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 
 from config_system.config_loader import AgentConfig, PromptsConfig
@@ -156,11 +156,16 @@ class Agent:
             Processed output data
         """
         try:
-            # Extract the main input content
-            input_content = input_data.get("input", "")
-            if isinstance(input_content, dict):
-                # If input is a dict, convert to string representation
-                input_content = str(input_content)
+            # Extract the raw input content - this will be used for {input}
+            # This is the special case for {input} which always represents the raw input
+            raw_input = input_data.get("input", "")
+            
+            # Create format_vars dictionary, starting with the raw input
+            # Remove "input" from input_data to prevent duplicate keys when merging
+            format_vars = {"input": raw_input}
+            
+            # Add all other fields from input_data except "input" to avoid duplicates
+            filtered_input_data = {k: v for k, v in input_data.items() if k != "input"}
             
             # Build the LangChain prompt chain with proper message types and roles
             messages = []
@@ -171,17 +176,13 @@ class Agent:
             
             # 2. Add human message template (ALWAYS included)
             if hasattr(self.prompts, 'human_message_template') and self.prompts.human_message_template:
-                human_content = self.prompts.human_message_template.format(
-                    input=input_content,
-                    **input_data  # Allow additional template variables
-                )
+                # Format with all variables, where {input} is the raw input and other fields come from input_data
+                human_content = self.prompts.human_message_template.format(**format_vars, **filtered_input_data)
                 messages.append(HumanMessage(content=human_content))
 
             # 3. Add the unnamed template content (Case 2 specific)
-            unnamed_content = unnamed_template_content.format(
-                input=input_content,
-                **input_data  # Allow additional template variables
-            )
+            # Format with all variables, where {input} is the raw input and other fields come from input_data
+            unnamed_content = unnamed_template_content.format(**format_vars, **filtered_input_data)
             messages.append(HumanMessage(content=unnamed_content))
 
             # 4. Add AI message prefix if available (optional AI response starter)
@@ -200,6 +201,13 @@ class Agent:
                 })
             
             response = chain.invoke(messages)
+            
+            # Debug logging to understand the response format
+            if self.logger:
+                self.logger.debug(f"Raw LLM response for {self.config.name}: {repr(response)}", extra={
+                    "component": self.config.name,
+                    "data": {"response_type": type(response).__name__, "response_length": len(str(response))}
+                })
             
             # Return structured output
             return {
@@ -228,11 +236,16 @@ class Agent:
             Processed output data
         """
         try:
-            # Extract the main input content
-            input_content = input_data.get("input", "")
-            if isinstance(input_content, dict):
-                # If input is a dict, convert to string representation
-                input_content = str(input_content)
+            # Extract the raw input content - this will be used for {input}
+            # This is the special case for {input} which always represents the raw input
+            raw_input = input_data.get("input", "")
+            
+            # Create format_vars dictionary, starting with the raw input
+            # Remove "input" from input_data to prevent duplicate keys when merging
+            format_vars = {"input": raw_input}
+            
+            # Add all other fields from input_data except "input" to avoid duplicates
+            filtered_input_data = {k: v for k, v in input_data.items() if k != "input"}
             
             # Build the LangChain prompt chain with proper message types and roles
             messages = []
@@ -243,18 +256,14 @@ class Agent:
             
             # 2. Add human message template (ALWAYS included)
             if hasattr(self.prompts, 'human_message_template') and self.prompts.human_message_template:
-                human_content = self.prompts.human_message_template.format(
-                    input=input_content,
-                    **input_data  # Allow additional template variables
-                )
+                # Format with all variables, where {input} is the raw input and other fields come from input_data
+                human_content = self.prompts.human_message_template.format(**format_vars, **filtered_input_data)
                 messages.append(HumanMessage(content=human_content))
 
             # 3. Add specific prompt template if available and specified
             if template_name is not None and hasattr(self.prompts, 'prompt_templates') and self.prompts.prompt_templates and template_name in self.prompts.prompt_templates:
-                template_content = self.prompts.prompt_templates[template_name].format(
-                    input=input_content,
-                    **input_data  # Allow additional template variables
-                )
+                # Format with all variables, where {input} is the raw input and other fields come from input_data
+                template_content = self.prompts.prompt_templates[template_name].format(**format_vars, **filtered_input_data)
                 messages.append(HumanMessage(content=template_content))
 
             # 4. Add AI message prefix if available (optional AI response starter)
@@ -273,6 +282,13 @@ class Agent:
                 })
             
             response = chain.invoke(messages)
+            
+            # Debug logging to understand the response format
+            if self.logger:
+                self.logger.debug(f"Raw LLM response for {self.config.name}: {repr(response)}", extra={
+                    "component": self.config.name,
+                    "data": {"response_type": type(response).__name__, "response_length": len(str(response))}
+                })
             
             # Return structured output
             return {
