@@ -25,198 +25,6 @@ config/
         └── prompts.yaml
 ```
 
-## Multi-Input Agent System
-
-Agents specify inputs as a list of sources:
-
-```yaml
-agents:
-  - name: "plan_maker"
-    input_sources: ["pipeline_input"]              # Single input from pipeline
-  - name: "plan_critique_generator" 
-    input_sources: ["plan_maker"]                   # Single input from agent
-  - name: "plan_critique_comparator"
-    input_sources: ["pipeline_input", "plan_maker", "plan_critique_generator"]  # Multi-input from agents and pipeline
-```
-
-### Input Sources
-- `"pipeline_input"`: Original input content from the pipeline (which comes from stdin or file(s)
-- `"agent_name"`: Output from specified agent
-- Multiple sources: Agent receives combined input from multiple agents or pipeline_input
-
-### Shared Data Structure
-
-Pipeline maintains unified context:
-
-```json
-{
-  "pipeline_name": "spec2code_pipeline",
-  "execution_successful": true,
-  "pipeline_input": {
-    "content": "...",
-    "source": "input.txt",
-    "size": 1322
-  },
-  "agents": {
-    "agent_name": {
-      "output": { "agent_response": "..." },
-      "metadata": {
-        "execution_time": 0.0,
-        "templates_used": ["template_name"],
-        "input_sources": "pipeline_input"  // or ["agent1", "agent2"], or ["pipeline_input", "agent1"], etc
-      }
-    }
-  },
-  "metadata": {
-    "agent_sequence": ["agent1", "agent2"],
-    "execution_time": 0.0
-  }
-}
-```
-
-### 4. Prompt Templates System
-
-The system supports three valid cases for `prompt_templates` configuration:
-
-#### Case 1: Missing/Empty Templates (prompts.yaml)
-```yaml
-# prompts.yaml - No prompt_templates defined
-system_message: |
-  You are an agent.
-human_message_template: |
-  Process this: {input}
-# prompt_templates: # Missing or empty
-```
-
-```yaml
-# pipeline.yaml - prompt_templates field can be present but ignored
-agents:
-  - name: "agent_name"
-    input_sources: ["pipeline_input"]
-    # prompt_templates: # Can be omitted or any value - will be ignored
-```
-
-**Result**: Uses only `human_message_template` content. Any template names in pipeline.yaml are ignored since no templates are defined.
-
-#### Case 2: String Content (prompts.yaml)
-```yaml
-# prompts.yaml - String as template content
-system_message: |
-  You are an agent.
-human_message_template: |
-  Process this: {input}
-prompt_templates: |
-  Custom template content with {input} variable.
-  This is the actual template text, not a name reference.
-```
-
-```yaml
-# pipeline.yaml - Must have empty/absent prompt_templates
-agents:
-  - name: "agent_name"
-    input_sources: ["pipeline_input"]
-    # prompt_templates: # Must be omitted or empty for Case 2
-```
-
-**Result**: System automatically instantiates both `human_message_template` and the unnamed template content. `pipeline.yaml` must not specify template names for this case.
-
-#### Case 3: Named Templates Dictionary (prompts.yaml)
-```yaml
-# prompts.yaml - Named templates with content
-system_message: |
-  You are an agent.
-human_message_template: |
-  Process this: {input}
-prompt_templates:
-  with_context: |
-    Create a plan for: {input}
-    Consider existing context.
-  simple_plan: |
-    Create a basic plan for: {input}
-```
-
-```yaml
-# pipeline.yaml - Reference specific template names
-agents:
-  - name: "agent_name"
-    input_sources: ["pipeline_input"]
-    prompt_templates: "with_context"  # Specific template name
-    # OR
-    prompt_templates: ["with_context", "simple_plan"]  # Multiple templates
-    # OR omit field to use all available templates
-```
-
-**Result**: Uses specified named template(s) content.
-
-#### Final Output Structure
-
-**Case 1 - Missing/Empty Templates**:
-```json
-{
-  "agents": {
-    "agent_name": {
-      "output": {
-        "agent_response": "Response using human_message_template only"
-      },
-      "metadata": {
-        "execution_time": 123.45,
-        "templates_used": [],  // Empty array - no templates used
-        "input_sources": "pipeline_input"
-      }
-    }
-  }
-}
-```
-
-**Case 2 - String Content**:
-```json
-{
-  "agents": {
-    "agent_name": {
-      "output": {
-        "agent_response": "Response using both human_message_template and unnamed content"
-      },
-      "metadata": {
-        "execution_time": 123.45,
-        "templates_used": ["unnamed_template"],  // Internal identifier for unnamed content
-        "input_sources": "pipeline_input"
-      }
-    }
-  }
-}
-```
-
-**Case 3 - Named Templates Dictionary** (with multiple templates):
-```json
-{
-  "agents": {
-    "agent_name": {
-      "output": {
-        "template_results": {
-          "with_context": {"agent_response": "..."},
-          "simple_plan": {"agent_response": "..."}
-        },
-        "execution_metadata": {
-          "templates_used": ["with_context", "simple_plan"],
-          "template_count": 2
-        }
-      },
-      "metadata": {
-        "execution_time": 123.45,
-        "templates_used": ["with_context", "simple_plan"],
-        "input_sources": "pipeline_input"
-      }
-    }
-  }
-}
-```
-
-### 5. Log Level Settings
-
-```yaml
-settings:
-  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
-```
 
 ## Configuration Types
 
@@ -333,38 +141,38 @@ credentials:
   api_key: "${OPENAI_API_KEY}"
 ```
 
-### 3. Agent Configuration
+## Agent Configuration
 
 Agent configuration consists of **two files** that work together:
 
-#### 3.1. Agent Metadata (`agents/*/agent.yaml`)
+### Agent Metadata (`agents/*/agent.yaml`)
 
 Defines agent metadata, model reference, and LangChain-specific settings.
 
-##### Generic Structure:
+**Generic Structure:**
 ```yaml
 name: "agent_name"
 description: "Agent purpose description"
 llm: "model_config_name"           # Must match filename in models/ directory
 ```
 
-##### Parameters:
+**Parameters:**
 - **`name`**: Agent identifier (should match directory name)
 - **`description`**: Human-readable description of agent purpose
 - **`llm`**: Reference to model configuration name (must exactly match a file in `models/` directory)
 
-##### Example:
+**Example:**  
 ```yaml
 name: "plan_maker"
 description: "Creates detailed implementation plans from decomposed steps"
 llm: "openai_gpt4"
 ```
 
-#### 3.2. Prompt Configuration (`agents/*/prompts.yaml`)
+### Prompt Configuration (`agents/*/prompts.yaml`)
 
 Defines prompt templates and system messages for the agent.
 
-##### Generic Structure:
+**Generic Structure:**
 ```yaml
 system_message: |
   System message defining the agent's role and behavior.
@@ -395,7 +203,7 @@ prompt_templates:
     Another template variation.
 ```
 
-##### Parameters:
+**Parameters:**
 - **`system_message`**: (Required) System prompt defining agent's role and behavior
 - **`human_message_template`**: (Required) Template for human messages, supports variables like `{input}`
 - **`ai_message_prefix`**: (Optional) Prefix for AI responses
@@ -404,11 +212,11 @@ prompt_templates:
   - **Single string**: Actual template content (not a name reference)
   - **Dictionary**: Named template variations for different scenarios
 
-##### Template Variables:
+**Template Variables:**
 - **`{input}`**: The main input content (if JSON, this is the string representation of the entire JSON object)
 - **Any JSON key**: If input is JSON, you can reference any key directly (e.g., `{title}`, `{description}`, `{requirements}`)
 
-##### Example:
+**Example:**
 ```yaml
 system_message: |
   You are a technical planning agent. Your role is to create detailed 
@@ -434,4 +242,139 @@ prompt_templates:
   
   simple_plan: |
     Create a basic implementation plan for: {input}
+```
+
+#### `prompt_templates` Explanation
+
+The system supports three valid cases for `prompt_templates` configuration:
+
+**Case 1: Missing/Empty Templates**
+```yaml
+# prompts.yaml - No prompt_templates defined
+system_message: |
+  You are an agent.
+human_message_template: |
+  Process this: {input}
+# prompt_templates: # Missing or empty
+```
+
+```yaml
+# pipeline.yaml - prompt_templates field can be present but ignored
+agents:
+  - name: "agent_name"
+    input_sources: ["pipeline_input"]
+    # prompt_templates: # Can be omitted or any value - will be ignored
+```
+
+**Result**: Uses only `human_message_template` content. Any template names in pipeline.yaml are ignored since no templates are defined.
+
+```json
+// Final output structure
+{
+  "agents": {
+    "agent_name": {
+      "output": {
+        "agent_response": "Response using human_message_template only"
+      },
+      "metadata": {
+        "execution_time": 123.45,
+        "templates_used": [],  // Empty array - no templates used
+        "input_sources": "pipeline_input"
+      }
+    }
+  }
+}
+```
+
+**Case 2: String Content**
+```yaml
+# prompts.yaml - String as template content
+system_message: |
+  You are an agent.
+human_message_template: |
+  Process this: {input}
+prompt_templates: |
+  Custom template content with {input} variable.
+  This is the actual template text, not a name reference.
+```
+
+```yaml
+# pipeline.yaml - Must have empty/absent prompt_templates
+agents:
+  - name: "agent_name"
+    input_sources: ["pipeline_input"]
+    # prompt_templates: # Must be omitted or empty for Case 2
+```
+
+**Result**: System automatically instantiates both `human_message_template` and the unnamed template content. `pipeline.yaml` must not specify template names for this case.
+
+```json
+// Final output structure
+{
+  "agents": {
+    "agent_name": {
+      "output": {
+        "agent_response": "Response using both human_message_template and unnamed content"
+      },
+      "metadata": {
+        "execution_time": 123.45,
+        "templates_used": ["unnamed_template"],  // Internal identifier for unnamed content
+        "input_sources": "pipeline_input"
+      }
+    }
+  }
+}
+```
+
+**Case 3: Named Templates Dictionary**
+```yaml
+# prompts.yaml - Named templates with content
+system_message: |
+  You are an agent.
+human_message_template: |
+  Process this: {input}
+prompt_templates:
+  with_context: |
+    Create a plan for: {input}
+    Consider existing context.
+  simple_plan: |
+    Create a basic plan for: {input}
+```
+
+```yaml
+# pipeline.yaml - Reference specific template names
+agents:
+  - name: "agent_name"
+    input_sources: ["pipeline_input"]
+    prompt_templates: "with_context"  # Specific template name
+    # OR
+    prompt_templates: ["with_context", "simple_plan"]  # Multiple templates
+    # OR omit field to use all available templates
+```
+
+**Result**: Uses specified named template(s) content.
+
+```json
+// Final output structure
+{
+  "agents": {
+    "agent_name": {
+      "output": {
+        "template_results": {
+          "with_context": {"agent_response": "..."},
+          "simple_plan": {"agent_response": "..."}
+        },
+        "execution_metadata": {
+          "templates_used": ["with_context", "simple_plan"],
+          "template_count": 2
+        }
+      },
+      "metadata": {
+        "execution_time": 123.45,
+        "templates_used": ["with_context", "simple_plan"],
+        "input_sources": "pipeline_input"
+      }
+    }
+  }
+}
 ```
