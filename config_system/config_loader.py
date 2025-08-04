@@ -303,10 +303,12 @@ class ConfigLoader:
             except ConfigValidationError as e:
                 raise ConfigValidationError(f"Cannot validate pipeline templates for agent '{agent_name}': {e}")
             
+            # Initialize available_templates list
+            available_templates = []
+            
             # Handle the three valid cases for prompt_templates
             if prompts_config.prompt_templates is None:
-                # Case 1: Missing/empty prompt_templates - no additional validation needed
-                # Only human_message_template will be used
+                # Case 1: Missing/empty prompt_templates - only human_message_template used
                 pass
             elif isinstance(prompts_config.prompt_templates, str):
                 # Case 2: Unnamed template content - pipeline.yaml should not specify templates
@@ -317,6 +319,8 @@ class ConfigLoader:
                         f"but pipeline.yaml specifies prompt_templates. For unnamed templates, "
                         f"leave prompt_templates empty/absent in pipeline.yaml."
                     )
+                # For string templates, we have one unnamed template available
+                available_templates = ["unnamed_template"]
             elif isinstance(prompts_config.prompt_templates, dict):
                 # Case 3: Named templates dictionary - validate specific template names
                 available_templates = list(prompts_config.prompt_templates.keys())
