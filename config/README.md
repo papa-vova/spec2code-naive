@@ -68,7 +68,7 @@ pipeline:
   - **`log_level`**: Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) - Default: `INFO`
   - **`create_run_artifacts`**: Whether to create run artifacts - Default: `true`
   - **`include_messages_in_artifacts`**: Whether to capture LLM messages in artifacts - Default: `false`
-  - **`runs_directory`**: Directory for storing run artifacts - Default: "`runs/`"
+  - **`runs_directory`**: Directory for storing run artifacts - Default: `runs/`
 
 **Example:**
 ```yaml
