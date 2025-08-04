@@ -20,7 +20,6 @@ spec2code-naive/
 ├── test_config.py             # Config validation tool
 ├── requirements.txt           # Python dependencies
 ├── sample_input.txt           # Example input file
-├── empty_test.txt             # Empty test file
 ├── logging_config.py          # Logging configuration
 ├── exceptions.py              # Custom exceptions
 ├── core/

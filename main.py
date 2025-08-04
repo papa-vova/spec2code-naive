@@ -9,6 +9,7 @@ import time
 from typing import List, Dict, Any
 from core.orchestrator import Orchestrator
 from core.run_manager import RunManager
+from config_system.config_loader import ConfigLoader
 from exceptions import PipelineError, InputError, FileNotFoundError, EmptyFileError
 from logging_config import setup_pipeline_logging, log_step_start, log_step_complete, log_debug, log_error
 
@@ -128,9 +129,13 @@ def main():
         args = parser.parse_args()
         input_file = args.input
         
-        # Set up logging
+        # Load pipeline configuration early to get the correct log level
+        config_loader = ConfigLoader(args.config_root)
+        pipeline_config = config_loader.load_pipeline_config()
+        
+        # Set up logging using pipeline's log_level setting (not command line)
         pipeline_logger = setup_pipeline_logging(
-            log_level=args.log_level,
+            log_level=pipeline_config.settings.log_level,
             verbose=args.verbose
         )
         logger = pipeline_logger.get_logger("main")
