@@ -26,13 +26,11 @@ config/
 ```
 
 
-## Configuration Types
-
-### 1. Pipeline Configuration (`pipeline.yaml`)
+## Pipeline Configuration (`pipeline.yaml`)
 
 Defines the overall pipeline execution flow, agent sequence, and data mapping.
 
-#### Generic Structure:
+**Generic Structure:**
 ```yaml
 pipeline:
   name: "pipeline_name"
@@ -56,7 +54,7 @@ pipeline:
     runs_directory: "runs"                   # Directory for run artifacts (default: runs)               
 ```
 
-#### Parameters:
+**Parameters:**
 - **`name`**: Unique identifier for the pipeline
 - **`description`**: Human-readable description of pipeline purpose
 - **`agents`**: List of agents to execute in sequence
@@ -72,7 +70,7 @@ pipeline:
   - **`include_messages_in_artifacts`**: Whether to capture LLM messages in artifacts - Default: false
   - **`runs_directory`**: Directory for storing run artifacts - Default: "runs"
 
-#### Example:
+**Example:**
 ```yaml
 pipeline:
   name: "spec2code_pipeline"
@@ -100,11 +98,11 @@ pipeline:
     runs_directory: "runs"
 ```
 
-### 2. Model Configuration (`models/*.yaml`)
+## Model Configuration (`models/*.yaml`)
 
 Defines LLM model providers, parameters, and credentials. The system uses dynamic provider discovery, supporting any LangChain-compatible provider.
 
-#### Generic Structure:
+**Generic Structure:**
 ```yaml
 name: "model_identifier"
 provider: "provider_name"          # LangChain provider (e.g., "OpenAI")
@@ -120,14 +118,14 @@ credentials:                       # Authentication/connection parameters
   # Any provider-specific credentials...
 ```
 
-#### Parameters:
+**Parameters:**
 - **`name`**: Unique identifier for this model configuration
 - **`provider`**: LangChain provider name (e.g., "OpenAI", case is important)
 - **`model_name`**: Specific model name within the provider
 - **`parameters`**: Dict of model-specific parameters (all parameters are passed directly to the LLM constructor)
 - **`credentials`**: Dict of authentication/connection parameters
 
-#### Example:
+**Example:**
 ```yaml
 name: "openai_gpt4"
 provider: "OpenAI"
