@@ -242,15 +242,10 @@ pipeline:
     
   # Pipeline-level settings
   settings:
-    log_level: "INFO"               # DEBUG, INFO, WARNING, ERROR
-    
-  # Common model parameters (optional)
-  # These parameters are passed to all models, 
-  # and can be overridden in individual model configs
-  common_model_parameters:
-    temperature: 0.7                
-    top_p: 1.0                     
-    streaming: false               
+    log_level: "INFO"                        # DEBUG, INFO, WARNING, ERROR (default: INFO)
+    create_run_artifacts: true               # Whether to create run artifacts (default: true)
+    include_messages_in_artifacts: false     # Whether to capture LLM messages (default: false)
+    runs_directory: "runs"                   # Directory for run artifacts (default: runs)               
 ```
 
 #### Parameters:

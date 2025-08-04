@@ -150,22 +150,22 @@ The pipeline produces a structured JSON output with the following components:
   "agents": {
     "agent_name": {
       "output": { 
-        "agent_response": "...",
-        "messages": [  // Optional: only when include_messages_in_artifacts: true
-          {
-            "type": "system",
-            "content": "You are a business analyst..."
-          },
-          {
-            "type": "human", 
-            "content": "Please analyze the following requirements..."
-          },
-          {
-            "type": "ai",
-            "content": "I'll help you analyze..."
-          }
-        ]
+        "agent_response": "..."
       },
+      "messages": [  // Optional: only when include_messages_in_artifacts: true
+        {
+          "type": "system",
+          "content": "You are a business analyst..."
+        },
+        {
+          "type": "human", 
+          "content": "Please analyze the following requirements..."
+        },
+        {
+          "type": "ai",
+          "content": "I'll help you analyze..."
+        }
+      ],
       "metadata": {
         "execution_time": 0.0,
         "templates_used": ["template_name"],
