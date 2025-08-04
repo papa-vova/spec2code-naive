@@ -206,16 +206,19 @@ class Orchestrator:
         # Get available templates from agent's prompts config
         prompts_config = self.config_loader.load_prompts_config(agent_config.name)
         
+        # Get include_messages_in_artifacts setting from pipeline config
+        include_messages = self.pipeline_config.settings.include_messages_in_artifacts
+        
         # Determine what templates to execute based on prompts.yaml content
         if prompts_config.prompt_templates is None:
             # Case 1: Missing/empty prompt_templates - only human_message_template
-            result = agent.execute(agent_input, None)  # None indicates no additional template
+            result = agent.execute(agent_input, None, include_messages)  # None indicates no additional template
             result["templates_used"] = []
             return result
         elif isinstance(prompts_config.prompt_templates, str):
             # Case 2: Unnamed template content - execute both human_message_template and unnamed content
             # Execute with the unnamed template content directly
-            result = agent.execute_with_unnamed_template(agent_input, prompts_config.prompt_templates)
+            result = agent.execute_with_unnamed_template(agent_input, prompts_config.prompt_templates, include_messages)
             result["templates_used"] = ["unnamed_template"]
             return result
         elif isinstance(prompts_config.prompt_templates, dict):
@@ -246,7 +249,7 @@ class Orchestrator:
                 )
             
             # Execute agent with this specific template
-            template_result = agent.execute(agent_input, template_name)
+            template_result = agent.execute(agent_input, template_name, include_messages)
             
             # Store individual template result
             aggregated_output["template_results"][template_name] = template_result["output"]

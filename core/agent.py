@@ -33,7 +33,7 @@ class Agent:
         """Set logger for this agent instance."""
         self.logger = logger
     
-    def execute(self, input_data: Dict[str, Any], template_name: str) -> Dict[str, Any]:
+    def execute(self, input_data: Dict[str, Any], template_name: str, include_messages_in_artifacts: bool = False) -> Dict[str, Any]:
         """
         Execute the agent with given input data.
         
@@ -60,7 +60,7 @@ class Agent:
                 }
             else:
                 # Actual LangChain execution logic
-                output = self._execute_template(input_data, template_name)
+                output = self._execute_template(input_data, template_name, include_messages_in_artifacts)
             
             result = {
                 "output": output,
@@ -87,7 +87,7 @@ class Agent:
                 log_error(self.logger, f"Agent {self.config.name} execution failed: {str(e)}", self.config.name, e)
             raise
     
-    def execute_with_unnamed_template(self, input_data: Dict[str, Any], unnamed_template_content: str) -> Dict[str, Any]:
+    def execute_with_unnamed_template(self, input_data: Dict[str, Any], unnamed_template_content: str, include_messages_in_artifacts: bool = False) -> Dict[str, Any]:
         """
         Execute the agent with unnamed template content (Case 2).
         
@@ -115,7 +115,7 @@ class Agent:
                 }
             else:
                 # Actual LangChain execution logic with unnamed template
-                output = self._execute_with_unnamed_template(input_data, unnamed_template_content)
+                output = self._execute_with_unnamed_template(input_data, unnamed_template_content, include_messages_in_artifacts)
             
             result = {
                 "output": output,
@@ -143,7 +143,7 @@ class Agent:
                 log_error(self.logger, f"Agent {self.config.name} execution with unnamed template failed: {str(e)}", self.config.name, e)
             raise
     
-    def _execute_with_unnamed_template(self, input_data: Dict[str, Any], unnamed_template_content: str) -> Dict[str, Any]:
+    def _execute_with_unnamed_template(self, input_data: Dict[str, Any], unnamed_template_content: str, include_messages_in_artifacts: bool = False) -> Dict[str, Any]:
         """
         Execute the agent using LangChain with unnamed template content (Case 2).
         Instantiates both human_message_template AND the unnamed template content.
@@ -209,11 +209,25 @@ class Agent:
                     "data": {"response_type": type(response).__name__, "response_length": len(str(response))}
                 })
             
-            # Return structured output
-            return {
+            # Return structured output with optional message capture
+            result = {
                 "agent_response": response,
                 "llm_used": True
             }
+            
+            # Capture messages if requested
+            if include_messages_in_artifacts:
+                result["messages"] = [
+                    {
+                        "type": "system" if isinstance(msg, SystemMessage) else 
+                                "human" if isinstance(msg, HumanMessage) else 
+                                "ai" if isinstance(msg, AIMessage) else "unknown",
+                        "content": msg.content
+                    }
+                    for msg in messages
+                ]
+            
+            return result
             
         except Exception as e:
             if self.logger:
@@ -225,12 +239,14 @@ class Agent:
                 "error": str(e)
             }
     
-    def _execute_template(self, input_data: Dict[str, Any], template_name: str) -> Dict[str, Any]:
+    def _execute_template(self, input_data: Dict[str, Any], template_name: str, include_messages_in_artifacts: bool = False) -> Dict[str, Any]:
         """
         Execute the agent using actual LangChain with LLM and prompts.
         
         Args:
             input_data: JSON input data
+            template_name: Name of the template to use
+            include_messages_in_artifacts: Whether to capture messages in output
             
         Returns:
             Processed output data
@@ -290,11 +306,25 @@ class Agent:
                     "data": {"response_type": type(response).__name__, "response_length": len(str(response))}
                 })
             
-            # Return structured output
-            return {
+            # Return structured output with optional message capture
+            result = {
                 "agent_response": response,
                 "llm_used": True
             }
+            
+            # Capture messages if requested
+            if include_messages_in_artifacts:
+                result["messages"] = [
+                    {
+                        "type": "system" if isinstance(msg, SystemMessage) else 
+                                "human" if isinstance(msg, HumanMessage) else 
+                                "ai" if isinstance(msg, AIMessage) else "unknown",
+                        "content": msg.content
+                    }
+                    for msg in messages
+                ]
+            
+            return result
             
         except Exception as e:
             if self.logger:

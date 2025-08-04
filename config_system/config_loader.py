@@ -71,6 +71,7 @@ class PipelineSettingsConfig(BaseModel):
     log_level: str = "INFO"
     # Run management settings
     create_run_artifacts: bool = True
+    include_messages_in_artifacts: bool = False
     runs_directory: str = "runs"
 
 

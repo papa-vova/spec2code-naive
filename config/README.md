@@ -263,8 +263,11 @@ pipeline:
     - `"agent_name"`: Uses output from specified agent
   - **`prompt_templates`**: (Optional) Which prompt template(s) to use
 - **`execution.mode`**: Execution mode (currently only "sequential")
-- **`settings.log_level`**: Logging level (DEBUG, INFO, WARNING, ERROR)
-- **`common_model_parameters`**: (Optional) Default parameters applied to all models
+- **`settings`**: Pipeline-level settings
+  - **`log_level`**: Logging level (DEBUG, INFO, WARNING, ERROR) - Default: "INFO"
+  - **`create_run_artifacts`**: Whether to create run artifacts - Default: true
+  - **`include_messages_in_artifacts`**: Whether to capture LLM messages in artifacts - Default: false
+  - **`runs_directory`**: Directory for storing run artifacts - Default: "runs"
 
 #### Example:
 ```yaml
@@ -288,11 +291,10 @@ pipeline:
     mode: "sequential"
     
   settings:
-    log_level: "INFO"
-    
-  common_model_parameters:
-    temperature: 0.7
-    streaming: false
+    log_level: "DEBUG"
+    create_run_artifacts: true
+    include_messages_in_artifacts: true
+    runs_directory: "runs"
 ```
 
 ### 2. Model Configuration (`models/*.yaml`)
