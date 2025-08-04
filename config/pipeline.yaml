@@ -10,7 +10,7 @@ pipeline:
     mode: "sequential"
     
   settings:
-    log_level: "DEBUG"
+    log_level: "ERROR"
     create_run_artifacts: true
     include_messages_in_artifacts: true
     runs_directory: "runs"

@@ -4,9 +4,7 @@ system_message: |
 human_message_template: |
   Transform the following description into a formal requirements specification document in valid JSON format:
 
-  ```
   {input}
-  ```
 
   Your JSON output MUST include the following elements:
   

@@ -158,11 +158,8 @@ class Agent:
         try:
             # Extract the raw input content - this will be used for {input}
             # This is the special case for {input} which always represents the raw input
-            raw_input = input_data.get("input", "")
-            
-            # Create format_vars dictionary, starting with the raw input
-            # Remove "input" from input_data to prevent duplicate keys when merging
-            format_vars = {"input": raw_input}
+            # Prepare format variables with proper input substitution logic
+            format_vars = self._prepare_format_vars(input_data)
             
             # Add all other fields from input_data except "input" to avoid duplicates
             filtered_input_data = {k: v for k, v in input_data.items() if k != "input"}
@@ -239,6 +236,54 @@ class Agent:
                 "error": str(e)
             }
     
+    def _prepare_format_vars(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Prepare format variables for template substitution.
+        
+        Args:
+            input_data: Input data from orchestrator
+            
+        Returns:
+            Dictionary with format variables where:
+            - {input} contains the raw original file content
+            - {param} contains values from JSON input (if input is JSON)
+        """
+        # Extract the raw input content for {input} substitution
+        # {input} should always be the original file content, not the internal structure
+        if "input" in input_data and isinstance(input_data["input"], dict) and "content" in input_data["input"]:
+            # Case: input_data["input"] is the pipeline_input dictionary with content/source/size
+            pipeline_input = input_data["input"]
+            raw_input_content = pipeline_input["content"]
+            
+            # Try to parse as JSON for parameter extraction
+            json_params = {}
+            try:
+                import json
+                json_params = json.loads(raw_input_content)
+                if not isinstance(json_params, dict):
+                    json_params = {}  # Only use dict-type JSON for parameter extraction
+            except (json.JSONDecodeError, TypeError):
+                # Not valid JSON or not a dict - no parameters available
+                json_params = {}
+                
+        elif "input" in input_data:
+            # Case: input_data["input"] is already the raw content
+            raw_input_content = str(input_data["input"])
+            json_params = {}
+        else:
+            # Fallback case
+            raw_input_content = ""
+            json_params = {}
+        
+        # Create format_vars dictionary with {input} as raw content
+        format_vars = {"input": raw_input_content}
+        
+        # Add JSON parameters for {param} substitution
+        # These will raise KeyError if used but not available (as requested)
+        format_vars.update(json_params)
+        
+        return format_vars
+    
     def _execute_template(self, input_data: Dict[str, Any], template_name: str, include_messages_in_artifacts: bool = False) -> Dict[str, Any]:
         """
         Execute the agent using actual LangChain with LLM and prompts.
@@ -254,11 +299,8 @@ class Agent:
         try:
             # Extract the raw input content - this will be used for {input}
             # This is the special case for {input} which always represents the raw input
-            raw_input = input_data.get("input", "")
-            
-            # Create format_vars dictionary, starting with the raw input
-            # Remove "input" from input_data to prevent duplicate keys when merging
-            format_vars = {"input": raw_input}
+            # Prepare format variables with proper input substitution logic
+            format_vars = self._prepare_format_vars(input_data)
             
             # Add all other fields from input_data except "input" to avoid duplicates
             filtered_input_data = {k: v for k, v in input_data.items() if k != "input"}
