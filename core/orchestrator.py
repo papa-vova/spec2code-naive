@@ -123,7 +123,7 @@ class Orchestrator:
                     "output": agent_output["output"],
                     "metadata": {
                         "execution_time": (time.time() - agent_start_time) * 1000,
-                        "templates_used": agent_output.get("templates_used", []),
+                        "prompt_templates_used": agent_output.get("prompt_templates_used", []),
                         "input_sources": input_sources
                     }
                 }
@@ -202,77 +202,65 @@ class Orchestrator:
             return {"input": agent_input}
     
     def _execute_agent(self, agent: Agent, agent_input: Dict[str, Any], agent_config) -> Dict[str, Any]:
-        """Execute agent with specified prompt templates and aggregate results."""
+        """Execute agent with all templates consolidated into a single execution."""
         # Get available templates from agent's prompts config
         prompts_config = self.config_loader.load_prompts_config(agent_config.name)
         
         # Get include_messages_in_artifacts setting from pipeline config
         include_messages = self.pipeline_config.settings.include_messages_in_artifacts
         
-        # Determine what templates to execute based on prompts.yaml content
+        # Prepare all templates based on the three cases
+        all_templates = []
+        prompt_templates_used = []
+        
         if prompts_config.prompt_templates is None:
-            # Case 1: Missing/empty prompt_templates - only human_message_template
-            result = agent.execute(agent_input, None, include_messages)  # None indicates no additional template
-            result["templates_used"] = []
-            return result
+            # Case 1: Missing/empty prompt_templates - only human_message_template (no additional templates)
+            all_templates = []
+            prompt_templates_used = []
         elif isinstance(prompts_config.prompt_templates, str):
-            # Case 2: Unnamed template content - execute both human_message_template and unnamed content
-            # Execute with the unnamed template content directly
-            result = agent.execute_with_unnamed_template(agent_input, prompts_config.prompt_templates, include_messages)
-            result["templates_used"] = ["unnamed_template"]
-            return result
+            # Case 2: Unnamed template content - add the string content as a template
+            all_templates = [prompts_config.prompt_templates]
+            prompt_templates_used = ["unnamed_template"]
         elif isinstance(prompts_config.prompt_templates, dict):
-            # Case 3: Named templates dictionary - use what's specified in pipeline.yaml
+            # Case 3: Named templates dictionary - get templates based on pipeline config
             available_templates = list(prompts_config.prompt_templates.keys())
-            template_list = agent_config.get_template_names(available_templates)
-        else:
-            template_list = []
-        
-        # Case 3: Multiple template execution
-        aggregated_output = {
-            "template_results": {},
-            "execution_metadata": {
-                "templates_used": template_list,
-                "template_count": len(template_list)
-            }
-        }
-        template_results = []  # Initialize list to collect template outputs
-        
-        for template_name in template_list:
-            if self.logger:
-                log_step_start(
-                    self.logger,
-                    agent_config.name,
-                    f"template_{template_name}",
-                    f"Executing {agent_config.name} with template '{template_name}'",
-                    {"template_name": template_name}
-                )
+            template_names = agent_config.get_template_names(available_templates)
             
-            # Execute agent with this specific template
-            template_result = agent.execute(agent_input, template_name, include_messages)
+            # Convert template names to actual template content
+            all_templates = []
+            for template_name in template_names:
+                template_content = prompts_config.prompt_templates[template_name]
+                all_templates.append(template_content)
             
-            # Store individual template result
-            aggregated_output["template_results"][template_name] = template_result["output"]
-            template_results.append(template_result["output"])
-            
-            if self.logger:
-                log_step_complete(
-                    self.logger,
-                    agent_config.name,
-                    f"template_{template_name}",
-                    f"Template '{template_name}' execution completed",
-                    {"template_name": template_name}
-                )
+            prompt_templates_used = template_names
         
-
+        if self.logger:
+            log_step_start(
+                self.logger,
+                agent_config.name,
+                "consolidated_execution",
+                f"Executing {agent_config.name} with {len(all_templates)} consolidated templates",
+                {"template_count": len(all_templates), "prompt_templates_used": prompt_templates_used}
+            )
         
-        # Return in standard agent output format
+        # Execute agent once with all templates consolidated
+        result = agent._execute_template(agent_input, all_templates, include_messages)
+        
+        if self.logger:
+            log_step_complete(
+                self.logger,
+                agent_config.name,
+                "consolidated_execution",
+                f"Consolidated template execution completed for {agent_config.name}",
+                {"template_count": len(all_templates)}
+            )
+        
+        # Return in standard agent output format with template metadata
         return {
-            "output": aggregated_output,
-            "templates_used": template_list,
+            "output": result,
             "metadata": {
                 "agent_name": agent_config.name,
-                "multi_template_execution": True,
-                "templates_executed": template_list
+                "prompt_templates_used": prompt_templates_used,
+                "prompt_templates_count": len(all_templates)
             }
         }

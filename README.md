@@ -167,7 +167,8 @@ The pipeline produces a structured JSON output with the following components:
       ],
       "metadata": {
         "execution_time": 0.0,
-        "templates_used": ["template_name"],
+        "prompt_templates_used": ["template_name"],
+        "prompt_templates_count": 1,
         "input_sources": "pipeline_input"  // or ["agent1", "agent2"]
       }
     }

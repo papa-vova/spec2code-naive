@@ -40,7 +40,6 @@ pipeline:
   agents:
     - name: "agent_name"              # Must match agent directory name
       input_sources: ["data_source"]   # Where this agent gets its input
-      prompt_templates: "template"    # Optional: specific template(s) to use
   
   # Execution settings
   execution:
@@ -62,7 +61,6 @@ pipeline:
   - **`input_sources`**: List of where this agent gets input data from:
     - `"pipeline_input"`: Uses the original pipeline input
     - `"agent_name"`: Uses output from specified agent
-  - **`prompt_templates`**: (Optional) Which prompt template(s) to use
 - **`execution.mode`**: Execution mode (currently only "sequential")
 - **`settings`**: Pipeline-level settings
   - **`log_level`**: Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) - Default: `INFO`
@@ -79,11 +77,9 @@ pipeline:
   agents:
     - name: "plan_maker"
       input_sources: ["pipeline_input"]
-      prompt_templates: "with_context"
       
     - name: "plan_critique_generator"
       input_sources: ["plan_maker"]
-      prompt_templates: "technical_feasibility"
       
     - name: "plan_critique_comparator"
       input_sources: ["pipeline_input", "plan_maker", "plan_critique_generator"]
@@ -234,12 +230,7 @@ human_message_template: |
 
 prompt_templates:
   with_context: |
-    Create an implementation plan for: {input}
-    
-    Consider the existing codebase context and dependencies.
-  
-  simple_plan: |
-    Create a basic implementation plan for: {input}
+    Create an implementation plan including this context: ...
 ```
 
 #### `prompt_templates` Explanation
@@ -253,18 +244,14 @@ system_message: |
   You are an agent.
 human_message_template: |
   Process this: {input}
-# prompt_templates: # Missing or empty
 ```
 
-```yaml
-# pipeline.yaml - prompt_templates field can be present but ignored
-agents:
-  - name: "agent_name"
-    input_sources: ["pipeline_input"]
-    # prompt_templates: # Can be omitted or any value - will be ignored
-```
+**Result**: Creates a consolidated execution using only `human_message_template` content since no prompt_templates are defined in `prompts.yaml`.
 
-**Result**: Uses only `human_message_template` content. Any template names in pipeline.yaml are ignored since no templates are defined.
+**Template Execution Flow**:
+1. Message chain: `[SystemMessage, HumanMessage(human_message_template)]`
+2. Single LLM call processes only the human message template
+3. Agent returns consolidated response
 
 ```json
 // Final output structure
@@ -272,11 +259,13 @@ agents:
   "agents": {
     "agent_name": {
       "output": {
-        "agent_response": "Response using human_message_template only"
+        "agent_response": "Response using human_message_template only",
+        "llm_used": true
       },
       "metadata": {
         "execution_time": 123.45,
-        "templates_used": [],  // Empty array - no templates used
+        "prompt_templates_used": [],  // Empty array - no templates used
+        "prompt_templates_count": 0,  // Number of templates processed
         "input_sources": "pipeline_input"
       }
     }
@@ -296,15 +285,12 @@ prompt_templates: |
   This is the actual template text, not a name reference.
 ```
 
-```yaml
-# pipeline.yaml - Must have empty/absent prompt_templates
-agents:
-  - name: "agent_name"
-    input_sources: ["pipeline_input"]
-    # prompt_templates: # Must be omitted or empty for Case 2
-```
+**Result**: System automatically creates a consolidated execution with both `human_message_template` and the unnamed template content as separate `HumanMessage` objects.
 
-**Result**: System automatically instantiates both `human_message_template` and the unnamed template content. `pipeline.yaml` must not specify template names for this case.
+**Template Execution Flow**:
+1. Message chain: `[SystemMessage, HumanMessage(human_message_template), HumanMessage(unnamed_content)]`
+2. Single LLM call processes both templates together
+3. Agent returns consolidated response
 
 ```json
 // Final output structure
@@ -312,11 +298,13 @@ agents:
   "agents": {
     "agent_name": {
       "output": {
-        "agent_response": "Response using both human_message_template and unnamed content"
+        "agent_response": "Consolidated response using both human_message_template and unnamed content",
+        "llm_used": true
       },
       "metadata": {
         "execution_time": 123.45,
-        "templates_used": ["unnamed_template"],  // Internal identifier for unnamed content
+        "prompt_templates_used": ["unnamed_template"],  // Internal identifier for unnamed content
+        "prompt_templates_count": 1,  // Number of templates processed
         "input_sources": "pipeline_input"
       }
     }
@@ -339,18 +327,12 @@ prompt_templates:
     Create a basic plan for: {input}
 ```
 
-```yaml
-# pipeline.yaml - Reference specific template names
-agents:
-  - name: "agent_name"
-    input_sources: ["pipeline_input"]
-    prompt_templates: "with_context"  # Specific template name
-    # OR
-    prompt_templates: ["with_context", "simple_plan"]  # Multiple templates
-    # OR omit field to use all available templates
-```
+**Result**: All available templates are consolidated into a single agent execution. Each template becomes a separate `HumanMessage` in the LLM conversation.
 
-**Result**: Uses specified named template(s) content.
+**Template Execution Flow**:
+1. System creates message chain: `[SystemMessage, HumanMessage(human_template), HumanMessage(template1), HumanMessage(template2), ...]`
+2. Single LLM call processes all templates together for better context
+3. Agent returns consolidated response
 
 ```json
 // Final output structure
@@ -358,18 +340,13 @@ agents:
   "agents": {
     "agent_name": {
       "output": {
-        "template_results": {
-          "with_context": {"agent_response": "..."},
-          "simple_plan": {"agent_response": "..."}
-        },
-        "execution_metadata": {
-          "templates_used": ["with_context", "simple_plan"],
-          "template_count": 2
-        }
+        "agent_response": "Consolidated response considering all templates",
+        "llm_used": true
       },
       "metadata": {
         "execution_time": 123.45,
-        "templates_used": ["with_context", "simple_plan"],
+        "prompt_templates_used": ["with_context", "simple_plan"],  // All templates that were processed
+        "prompt_templates_count": 2,  // Number of templates processed
         "input_sources": "pipeline_input"
       }
     }
