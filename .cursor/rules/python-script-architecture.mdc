@@ -1,0 +1,54 @@
+---
+description: One main functionality per Python script; pipelinable via bash
+globs: **/*.py
+alwaysApply: true
+---
+
+# Python Script Architecture
+
+## One Script per Main Functionality
+
+- Each major piece of functionality lives in its own Python script (e.g. `fetch_data.py`, `transform.py`, `validate.py`).
+- A script does one primary job: readable name and single responsibility.
+- Shared logic lives in importable modules or packages; scripts are thin entrypoints that call that logic.
+
+## Pipelinable via Bash
+
+- Scripts must be invokable from the shell and composable in a pipeline.
+- Read input from stdin or from arguments (files/paths); write results to stdout or to paths given by args/env.
+- Exit with code 0 on success, non-zero on failure (so `set -e` and `if ! script; then ...` work).
+- Avoid interactive prompts or blocking UI; support non-interactive use (env vars or CLI args for all inputs).
+
+```bash
+# ✅ Example pipeline
+./fetch_data.py --source api | ./transform.py --format json | ./validate.py > out.json
+# or
+./fetch_data.py --out raw.json && ./transform.py raw.json --out out.json
+```
+
+## Script Contract
+
+- Parse CLI with `argparse` (or similar); document options in help.
+- Load configuration from environment or config file, not hardcoded inside the script.
+- Use structured logging to stderr so stdout stays clean for piping; only write pipeline data to stdout.
+
+```python
+# ✅ Script shape
+#!/usr/bin/env python3
+import argparse
+import logging
+import sys
+
+logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+logger = logging.getLogger(__name__)
+
+def main():
+    p = argparse.ArgumentParser(description="...")
+    p.add_argument("--input", default="-", help="Input file or - for stdin")
+    args = p.parse_args()
+    # ... do one main thing, write result to stdout or --output
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main() or 0)
+```

@@ -1,0 +1,82 @@
+---
+description: Python quality, logging, config, and error handling—no print debugging
+globs: **/*.py
+alwaysApply: true
+---
+
+# Python Best Practices
+
+## Structured Logging
+
+- Use the `logging` module only. Never use `print()` for debugging or operational output.
+- **CRITICAL: Never log actual data**: no user prompts, search terms, queries, titles, category names, domain names, product names, or any other user/content in log messages. Use IDs (e.g. `idea_id`, `run_id`), counts, indexes, or hashes for traceability.
+- Configure a single logger per module: `logger = logging.getLogger(__name__)`.
+- Log with levels: `logger.debug()`, `logger.info()`, `logger.warning()`, `logger.error()`, `logger.exception()` in `except` blocks.
+- Use structured fields where helpful: `logger.info("Processing item", extra={"id": id, "count": n})` or keyword args in message.
+- **For UI display**: Only log high-level step events (`Step started: X`, `Step completed: X`). All detailed progress logs should be at DEBUG level and filtered out from UI.
+
+```python
+# ❌ BAD
+print(f"Got {x} items")
+print("Error:", e)
+
+# ✅ GOOD
+import logging
+logger = logging.getLogger(__name__)
+logger.info("Processing batch", extra={"count": len(items)})
+logger.exception("Operation failed")
+
+# ❌ BAD (actual data in logs - NEVER DO THIS)
+logger.info("Search for '%s'", user_query)
+logger.warning("Failed for term: %s", search_term)
+logger.info("Starting pytrends for seed=1/101, term=barcode scanner app, idea_id=idea_1_r1")
+logger.info("Processing title: %s", product_title)
+
+# ✅ GOOD (traceability without actual data)
+logger.info("Search completed", extra={"idea_id": idea_id})
+logger.warning("Failed for idea_id=%s", idea_id)
+logger.debug("Starting pytrends for seed=1/101, idea_id=idea_1_r1")  # DEBUG level, no term
+logger.info("Processing product", extra={"idea_id": idea_id, "product_index": idx})
+
+# ✅ GOOD (UI-level events only)
+logger.info("Step started: score_keywords")
+logger.info("Step completed: score_keywords")
+```
+
+## Configuration
+
+- No hardcoded config: paths, URLs, credentials, feature flags, limits.
+- Load from environment variables (e.g. `os.environ`), `.env` (e.g. `python-dotenv`), or a single config module that reads env/files.
+- Validate required config at startup and fail fast with a clear message.
+
+```python
+# ❌ BAD
+db_url = "postgresql://localhost/mydb"
+api_key = "sk-xxx"
+
+# ✅ GOOD
+db_url = os.environ["DATABASE_URL"]
+api_key = os.environ.get("API_KEY")  # or load from config module
+```
+
+## Error and Exception Handling
+
+- Catch specific exceptions; avoid bare `except:` or broad `except Exception` unless re-raising or handling deliberately.
+- Log before re-raising: use `logger.exception()` or `logger.error(..., exc_info=True)`.
+- Prefer custom exception types for domain errors; preserve cause: `raise MyError("msg") from e`.
+- Do not swallow errors silently; at minimum log and re-raise or exit with non-zero code.
+
+```python
+# ❌ BAD
+try:
+    do_thing()
+except:
+    pass
+
+# ✅ GOOD
+try:
+    do_thing()
+except FileNotFoundError as e:
+    logger.error("Config file missing", extra={"path": path})
+    raise ConfigError(f"Missing config: {path}") from e
+```

@@ -1,0 +1,96 @@
+---
+description: Markdown standards for pandoc compatibility and linter compliance
+globs: **/*.md
+alwaysApply: true
+---
+
+# Markdown Standards
+
+## Pandoc Compatibility
+
+All markdown files must be pandoc-friendly:
+
+1. **Use standard markdown syntax**: Prefer standard markdown over extensions
+2. **Avoid HTML in markdown**: Use markdown syntax instead of HTML tags when possible
+3. **Code blocks**: Use triple backticks with language identifiers
+4. **Links**: Use `[text](url)` format, not HTML `<a>` tags
+5. **Tables**: Use pipe-separated tables with proper alignment
+6. **Headers**: Use `#` for headers, maintain proper hierarchy (no skipped levels)
+7. **Lists**: Use consistent list markers (`-` or `*`), proper indentation
+8. **Line breaks**: Use two spaces or blank line for line breaks
+9. **Escaping**: Escape special characters properly (e.g., `\*` for literal asterisk)
+10. **NO EMOJIS**: Do NOT use Unicode emojis (✅, ⚠️, ❌, etc.) that break pandoc. Use plain text equivalents instead:
+    - ✅ → `[OK]` or `[YES]` or `(covered)`
+    - ⚠️ → `[PARTIAL]` or `(partial)` or `(limited)`
+    - ❌ → `[NO]` or `[MISSING]` or `(not covered)`
+    - Single-direction arrow symbols (←, →) are acceptable and pandoc-friendly
+    - Double-headed arrow (↔) is NOT acceptable - use `←→` instead
+    - Other Unicode emojis → Use ASCII text equivalents
+
+## Case Standards
+
+- **Headings**: Use Title Case for all markdown headings (`#`, `##`, `###`, etc.)
+- **Everything else**: Use sentence case (first word capitalized, rest lowercase unless proper nouns) for:
+  - Bold text blocks (`**text**`)
+  - List items
+  - Labels and section markers
+  - Inline emphasis
+- **Proper nouns**: Always capitalize proper nouns (product names, tool names, company names, etc.) regardless of context
+- **Examples**:
+  - Heading: `## Log-Based Observability` (Title Case)
+  - Bold label: `**Log-based observability**` (sentence case)
+  - Proper noun: `**Docker Compose pattern**` (Docker Compose is a proper noun)
+
+## Linter Error Handling
+
+**REQUIREMENT: Fix all linting errors at all times.** When editing markdown files, you must check for and fix linting errors. Only suppress errors when they represent intentional design choices that cannot be fixed without changing the document structure.
+
+### Fix Errors When Possible
+
+- **Always fix**: Formatting issues (trailing spaces, inconsistent indentation)
+- **Always fix**: Broken links, malformed tables
+- **Always fix**: Heading hierarchy issues
+- **Always fix**: List formatting inconsistencies
+- **Always fix**: Blank lines around lists, code blocks, and other elements (MD031, MD032)
+- **Always fix**: Any other fixable linting errors
+
+### Suppress Intentional Design Choices
+
+When linter errors are intentional design choices, suppress them using markdownlint-disable comments:
+
+```markdown
+<!-- markdownlint-disable MD036 -->
+**Bold text used as subsection** (intentional, not a heading)
+<!-- markdownlint-enable MD036 -->
+```
+
+Or disable for the entire file if the pattern is consistent:
+
+```markdown
+<!-- markdownlint-disable MD036 -->
+```
+
+Common cases to suppress:
+- **MD036** (no-emphasis-as-heading): When bold text is intentionally used for subsections instead of headings
+- **MD024** (no-duplicate-heading): When duplicate headings are intentional (e.g., in different sections)
+- **MD013** (line-length): When long lines are necessary (code examples, URLs)
+
+### Suppression Format
+
+Place suppression comments:
+- At the top of the file for file-wide suppressions
+- Immediately before the problematic content for inline suppressions
+- Immediately after for re-enabling specific rules
+
+Example:
+```markdown
+<!-- markdownlint-disable MD036 MD024 -->
+# Document Title
+
+**Subsection** (bold used intentionally, not a heading)
+
+## Section
+
+**Another subsection**
+<!-- markdownlint-enable MD036 MD024 -->
+```

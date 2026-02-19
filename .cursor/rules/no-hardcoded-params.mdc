@@ -1,0 +1,49 @@
+---
+description: NEVER hardcode parameters. All tunable values must be configurable via env, config, or CLI
+globs: **/*
+alwaysApply: true
+---
+
+# No Hardcoded Parameters
+
+**Rule: NEVER hardcode any tunable parameter.** This applies at all times when editing code.
+
+## What Counts as a Parameter
+
+- Numeric constants (rates, limits, thresholds, timeouts)
+- Magic numbers used in formulas or business logic
+- Default values that users might want to change
+- API endpoints, feature flags, batch sizes
+
+## Where Parameters Must Live
+
+1. **Environment variables** – primary; load via config module or `os.environ`
+2. **CLI arguments** – for script-specific overrides (e.g. `--apps-per-query`)
+3. **Config file** – if the project uses one; env overrides file
+
+## Implementation
+
+- Add new parameters to config module (or equivalent config module)
+- Use `get()`, `get_float()`, `get_int()` etc. with sensible defaults
+- Document in `.env.example` with the default and a brief comment
+- Reference the config constant in code; never inline the value
+
+```python
+# ❌ BAD
+CONVERSION_RATE = 0.01
+batch_size = 100
+timeout = 30
+
+# ✅ GOOD
+from config import CONVERSION_RATE_MAX
+batch_size = int(os.environ.get("BATCH_SIZE", "100"))
+timeout = config.get_int("TIMEOUT_SECONDS", 30)
+```
+
+## Exceptions
+
+- Literal 0, 1 used in pure logic (e.g. `if len(x) == 0`) – acceptable
+- Well-known constants (e.g. `math.pi`) – acceptable
+- Non-tunable code constants (e.g. HTTP status codes, MIME types) – acceptable
+
+When in doubt: make it configurable.

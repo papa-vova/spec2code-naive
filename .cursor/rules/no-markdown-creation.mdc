@@ -1,0 +1,47 @@
+---
+description: Never create ANY markdown files unless explicitly requested by the user
+globs: **/*
+alwaysApply: true
+---
+
+# No Markdown File Creation
+
+**CRITICAL RULE**: NEVER create ANY markdown files (*.md) unless explicitly requested by the user.
+
+## What This Means
+
+- Do NOT create README files
+- Do NOT create documentation files
+- Do NOT create summary files
+- Do NOT create changelog files
+- Do NOT create any .md files proactively
+
+## When to Create Markdown
+
+ONLY create markdown files when:
+
+- The user explicitly asks for a specific markdown file by name
+- The user explicitly requests documentation to be written
+
+## Examples
+
+**WRONG**:
+
+- Creating a REFACTORING_SUMMARY.md after refactoring
+- Creating a CHANGES.md to document changes
+- Creating a TODO.md for task tracking
+- Creating any markdown file "to help the user"
+
+**CORRECT**:
+
+- User: "Create a README.md for the new module"
+- User: "Write a DEPLOYMENT.md with deployment instructions"
+- User explicitly requests a specific markdown file
+
+## Why This Rule Exists
+
+- Users prefer to manage their own documentation
+- Unsolicited markdown files create clutter
+- Documentation should be created intentionally, not automatically
+
+**Remember**: When in doubt, DO NOT create markdown files. Ask the user first if documentation is needed.

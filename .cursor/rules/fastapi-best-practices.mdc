@@ -1,0 +1,49 @@
+---
+description: FastAPI best practices for web applications
+globs: **/*.py
+alwaysApply: true
+---
+
+# FastAPI Best Practices
+
+When editing FastAPI code:
+
+## Configuration
+
+- No hardcoded config: paths, URLs, limits. Load from environment via `app.config` or `os.environ`.
+- Validate required config at startup; fail fast with clear message.
+
+## Logging
+
+- Use `logging` module. Never use `print()` for operational output.
+- **CRITICAL: Never log actual data**: no user prompts, search terms, queries, titles, category names, domain names, product names, or any other user/content in log messages. Use IDs (e.g. `run_id`, `idea_id`), counts, indexes, or hashes for traceability.
+- Configure logger per module: `logger = logging.getLogger(__name__)`.
+- Log with levels: `logger.debug()`, `logger.info()`, `logger.warning()`, `logger.error()`, `logger.exception()` in `except` blocks.
+- **For UI display**: Only log high-level step events (`Step started: X`, `Step completed: X`). All detailed progress logs should be at DEBUG level and filtered out from UI.
+
+```python
+# ❌ BAD (actual data in logs - NEVER DO THIS)
+logger.info("Processing term: %s", search_term)
+logger.info("User prompt: %s", user_prompt)
+logger.warning("Failed for title: %s", product_title)
+
+# ✅ GOOD (traceability without actual data)
+logger.info("Processing search term", extra={"idea_id": idea_id, "term_index": idx})
+logger.info("Processing user prompt", extra={"run_id": run_id})
+logger.warning("Failed for idea_id=%s", idea_id)
+
+# ✅ GOOD (UI-level events only)
+logger.info("Step started: score_keywords")
+logger.info("Step completed: score_keywords")
+```
+
+## Error Handling
+
+- Catch specific exceptions. Log before re-raising.
+- Use `HTTPException` for API errors with appropriate status codes.
+- Do not swallow errors silently.
+
+## Dependency Injection
+
+- Use FastAPI Depends for services when it simplifies testing.
+- Keep routes thin; delegate to services.

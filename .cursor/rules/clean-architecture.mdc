@@ -1,0 +1,41 @@
+---
+description: Apply clean architecture principles—separation of concerns, dependency inversion, single responsibility
+globs: **/*.py
+alwaysApply: true
+---
+
+# Clean Architecture
+
+When editing Python code, follow these principles:
+
+## Separation of Concerns
+
+- **Domain logic** (business rules, formulas, transformations) lives in modules under domain packages (e.g., `core/`, `config_system/`). No I/O, no argparse, no `sys`.
+- **Scripts** (`main.py`, `test_*.py`) are thin entrypoints: parse args, load config, call domain logic, write output.
+- **I/O** (file read/write, HTTP, stdin/stdout) stays at the boundary. Inject dependencies (e.g., domain functions) instead of hard-coding imports where it improves testability.
+
+## Dependency Rule
+
+- Inner layers do not depend on outer layers. Domain modules do not import from scripts or entry points.
+- Prefer small, focused functions that take data in and return data out. Avoid functions that both fetch data and compute.
+
+## Single Responsibility
+
+- Each module has one primary purpose (e.g., `agent.py` = agent execution; `orchestrator.py` = pipeline orchestration).
+- Functions should do one thing. If a function exceeds ~30 lines or has multiple logical sections, consider splitting it.
+
+## Practices
+
+- **Extract pure logic** from scripts into domain modules when it's reusable or testable in isolation.
+- **Avoid script-specific helpers in domain modules**—no `argparse` or `sys.argv` in domain code.
+- **Use dependency injection** for config or external services when it simplifies testing (e.g., pass a function rather than importing it internally).
+- **Keep scripts readable**—main flow should be clear; details in small helper functions.
+
+## Web Application Considerations
+
+For web applications (FastAPI, Flask, etc.):
+
+- **Routes**: Parse request, call services, return response. No business logic.
+- **Services**: Orchestrate execution, handle business workflows. Use domain modules.
+- **Templates**: Presentation only. No secrets in templates.
+- **Domain**: Core business logic remains in domain modules; web layer is an adapter (HTTP, HTML).
