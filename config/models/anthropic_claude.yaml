@@ -1,8 +1,0 @@
-name: "anthropic_claude"
-provider: "anthropic"
-model_name: "claude-3-sonnet-20240229"
-parameters:
-  temperature: 0.7
-  max_tokens: 2000
-credentials:
-  api_key: "${ANTHROPIC_API_KEY}"

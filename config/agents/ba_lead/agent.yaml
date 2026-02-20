@@ -1,3 +1,0 @@
-name: "business_analyst_lead"
-description: "Business analyst lead, makes sure that the requirements prepared by junior business analysts are correct and complete"
-llm: "openai_o4"

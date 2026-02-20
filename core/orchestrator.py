@@ -37,16 +37,12 @@ from logging_config import log_step_start, log_step_complete, log_error
 AGENT_ARTIFACT_MAP: Dict[str, ArtifactType] = {
     "product_owner": ArtifactType.PROBLEM_BRIEF,
     "business_analyst": ArtifactType.BUSINESS_REQUIREMENTS,
-    "ba_lead": ArtifactType.NON_FUNCTIONAL_REQUIREMENTS,
     "solution_architect": ArtifactType.C4_MODEL,
     "system_analyst": ArtifactType.IMPLEMENTABLE_SPEC,
     "developer": ArtifactType.IMPLEMENTATION_DESIGN,
     "senior_developer": ArtifactType.DESIGN_REVIEW,
     "security_reviewer": ArtifactType.THREAT_MODEL,
     "qa_engineer": ArtifactType.TEST_PLAN,
-    "plan_maker": ArtifactType.IMPLEMENTATION_DESIGN,
-    "plan_critique_generator": ArtifactType.DESIGN_REVIEW,
-    "plan_critique_comparator": ArtifactType.CODE_REVIEW,
 }
 
 

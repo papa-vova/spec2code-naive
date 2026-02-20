@@ -3,8 +3,6 @@ role_model_profiles:
     model: openai_gpt5
   business_analyst:
     model: openai_gpt5
-  ba_lead:
-    model: openai_gpt5_mini
   solution_architect:
     model: openai_gpt5
   system_analyst:
@@ -16,12 +14,6 @@ role_model_profiles:
   security_reviewer:
     model: openai_gpt5_mini
   qa_engineer:
-    model: openai_gpt5_mini
-  plan_maker:
-    model: openai_gpt5
-  plan_critique_generator:
-    model: openai_gpt5_mini
-  plan_critique_comparator:
     model: openai_gpt5_mini
 rate_limit:
   max_retries: 6

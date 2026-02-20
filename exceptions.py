@@ -23,21 +23,3 @@ class EmptyFileError(InputError):
     pass
 
 
-class PlanGenerationError(PipelineError):
-    """Exception raised when plan generation fails."""
-    pass
-
-
-class ReportGenerationError(PipelineError):
-    """Exception raised when report generation fails."""
-    pass
-
-
-class MetricComparisonError(PipelineError):
-    """Exception raised when metric comparison fails."""
-    pass
-
-
-class LLMError(PipelineError):
-    """Exception raised when LLM operations fail."""
-    pass

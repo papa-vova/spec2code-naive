@@ -58,18 +58,13 @@ spec2code-naive/
     agent.py                       # Agent execution (LangChain)
     orchestrator.py                # Pipeline orchestration + artifact wrapping
   config/
-    agentic.yaml                   # Role model profiles
+    agentic.yaml                   # Role model profiles + rate limit + audit
     pipeline.yaml                  # Agent sequence and inputs
     models/                        # LLM provider configs
       openai_gpt5.yaml
       openai_gpt5_mini.yaml
-      openai_gpt5_nano.yaml
     agents/                        # Agent configs and prompts
       business_analyst/
-      ba_lead/
-      plan_maker/
-      plan_critique_generator/
-      plan_critique_comparator/
   config_system/
     config_loader.py               # Config loading, validation, agentic config
     agent_factory.py               # Agent instantiation with model override

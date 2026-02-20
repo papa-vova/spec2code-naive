@@ -1,9 +1,0 @@
-name: "ollama_llama"
-provider: "ollama"
-model_name: "llama2"
-parameters:
-  temperature: 0.7
-  num_predict: 2000
-credentials:
-  # Ollama typically runs locally without API keys
-  base_url: "http://localhost:11434"

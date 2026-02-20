@@ -121,7 +121,7 @@ def main():
         epilog="Examples:\n"
                "  %(prog)s validate                    # Validate all configurations\n"
                "  %(prog)s list                       # List available models and agents\n"
-               "  %(prog)s check --agent plan_maker   # Check specific agent\n"
+               "  %(prog)s check --agent business_analyst  # Check specific agent\n"
                "  %(prog)s --config-root ./my-configs validate  # Use custom config directory",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )

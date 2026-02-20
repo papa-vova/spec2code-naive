@@ -1,3 +1,0 @@
-name: "plan_critique_generator"
-description: "Generates independent critical reports on implementation plan consistency"
-llm: "openai_gpt4"

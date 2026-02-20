@@ -1,3 +1,0 @@
-name: "plan_critique_comparator"
-description: "Compares multiple independent reports and generates consistency metrics"
-llm: "openai_gpt4"

@@ -1,3 +1,0 @@
-name: "plan_maker"
-description: "Creates detailed implementation plans from decomposed steps"
-llm: "openai_gpt4"
