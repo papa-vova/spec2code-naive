@@ -7,7 +7,13 @@ import os
 from typing import Dict, Any, Optional
 from langchain_core.language_models.base import BaseLanguageModel
 
-from config_system.config_loader import ConfigLoader, ConfigValidationError, ModelConfig, AgentConfig
+from config_system.config_loader import (
+    ConfigLoader,
+    ConfigValidationError,
+    ModelConfig,
+    AgentConfig,
+    RateLimitConfig,
+)
 from core.agent import Agent
 
 
@@ -77,6 +83,13 @@ class AgentFactory:
         self.config_loader = config_loader
         self.model_registry = ModelRegistry()
     
+    def _get_rate_limit_config(self) -> RateLimitConfig:
+        """Get rate limit config; use defaults if agentic config unavailable."""
+        try:
+            return self.config_loader.get_rate_limit_config()
+        except ConfigValidationError:
+            return RateLimitConfig()
+
     def create_agent(self, agent_name: str, dry_run: bool = False) -> Agent:
         """Create a single agent instance from configuration."""
         # Load agent and prompts configuration
@@ -89,12 +102,13 @@ class AgentFactory:
             model_config = self.config_loader.load_model_config(agent_config.llm)
             llm = self.model_registry.create_llm(model_config)
         
-        # Create the agent using the new Agent class
+        rate_limit_config = self._get_rate_limit_config()
         return Agent(
             config=agent_config,
             prompts=prompts_config,
             llm=llm,
-            dry_run=dry_run
+            dry_run=dry_run,
+            rate_limit_config=rate_limit_config,
         )
 
     def create_agent_with_model(self, agent_name: str, model_name: str, dry_run: bool = False) -> Agent:
@@ -107,11 +121,13 @@ class AgentFactory:
             model_config = self.config_loader.load_model_config(model_name)
             llm = self.model_registry.create_llm(model_config)
 
+        rate_limit_config = self._get_rate_limit_config()
         return Agent(
             config=agent_config,
             prompts=prompts_config,
             llm=llm,
             dry_run=dry_run,
+            rate_limit_config=rate_limit_config,
         )
     
     def create_agents(self, required_agents: list, dry_run: bool = False) -> Dict[str, Any]:

@@ -8,6 +8,7 @@ Multi-agent LangChain pipeline that transforms rough feature descriptions into f
 - Each agent produces a **typed artifact** stored as a separate JSON file under `runs/<run_id>/artifacts/`.
 - Every artifact carries an **envelope** (identity, provenance, quality metadata, content hash) validated at write time.
 - **Per-role model profiles** in `config/agentic.yaml` control which LLM each role uses.
+- **Provider-agnostic rate limit handling**: retries on 429 with header-based wait or exponential backoff.
 - The orchestrator runs an information sufficiency gate and can stop runs below confidence threshold.
 - Deterministic and semantic audit results are persisted under `runs/<run_id>/audits/audit_results.json`.
 - Collaboration artifacts are stored separately under `runs/<run_id>/collaboration/`.
@@ -22,6 +23,8 @@ spec2code-naive/
   test_artifacts.py                # Artifact system tests
   test_collaboration.py            # Collaboration artifact tests
   test_audits.py                   # Audit gate and stop-logic tests
+  test_rate_limit.py               # Rate limit retry tests
+  test_derived_run.py              # Amendment and derived run tests
   test_runtime.py                  # Pipeline regression tests
   test_config.py                   # Config validation tool
   requirements.txt                 # Python dependencies
@@ -46,6 +49,10 @@ spec2code-naive/
       gates.py                     # Sufficiency + audit gate runners
       rubric_eval.py               # Semantic evaluator interface
       traceability.py              # Traceability matrix generator
+    orchestration/
+      derived_run.py               # Derived run and amendment handling
+    runtime/
+      rate_limit.py                # Rate limit retry (provider-agnostic)
   core/
     agent.py                       # Agent execution (LangChain)
     orchestrator.py                # Pipeline orchestration + artifact wrapping
@@ -96,6 +103,10 @@ export OPENAI_API_KEY="your-key"
 # Dry run (no LLM calls)
 .venv/bin/python main.py -i sample_input.txt --dry-run
 
+# Derived run (re-run with amendments from a base run)
+.venv/bin/python main.py --base-run <run_id> --amendment-file amendment.json
+.venv/bin/python main.py --base-run <run_id> --amendment-file amendment.json --dry-run
+
 # All options
 .venv/bin/python main.py --help
 ```
@@ -112,6 +123,12 @@ export OPENAI_API_KEY="your-key"
 # Audit gate tests
 .venv/bin/python -m unittest test_audits.py
 
+# Rate limit tests
+.venv/bin/python -m unittest test_rate_limit.py
+
+# Amendment and derived run tests
+.venv/bin/python -m unittest test_derived_run.py
+
 # Pipeline regression tests
 .venv/bin/python test_runtime.py
 
@@ -122,6 +139,8 @@ export OPENAI_API_KEY="your-key"
 .venv/bin/python -m unittest test_artifacts.py \
   && .venv/bin/python -m unittest test_collaboration.py \
   && .venv/bin/python -m unittest test_audits.py \
+  && .venv/bin/python -m unittest test_rate_limit.py \
+  && .venv/bin/python -m unittest test_derived_run.py \
   && .venv/bin/python test_runtime.py \
   && .venv/bin/python test_config.py validate
 ```
@@ -151,6 +170,45 @@ role_model_profiles:
 ```
 
 The orchestrator resolves the model per role at runtime and records it in artifact provenance.
+
+### Rate Limiting
+
+`config/agentic.yaml` can include a `rate_limit` section for LLM retry behavior:
+
+```yaml
+rate_limit:
+  max_retries: 6
+  initial_delay: 1.0
+  exponential_base: 2.0
+  use_header_reset: true
+  reset_header_names:
+    - x-ratelimit-reset-requests
+    - x-ratelimit-reset-tokens
+    - retry-after
+```
+
+On 429 (rate limit), the system waits using header-based reset time when available, else exponential backoff. Provider-agnostic: works with any LLM API that returns 429 and standard headers.
+
+### Derived Runs
+
+A derived run re-executes the pipeline from a base run with amendments:
+
+```bash
+.venv/bin/python main.py --base-run <base_run_id> --amendment-file amendment.json
+```
+
+Amendment JSON format:
+
+```json
+{
+  "base_run_id": "<run_id>",
+  "amended_assumptions": [{"id": "ASM-0001", "description": "...", "status": "..."}],
+  "amended_tradeoffs": [{"id": "TO-0001", "options": [...], "rationale": "..."}],
+  "reason": "Optional reason for amendment"
+}
+```
+
+All new artifacts from a derived run have `provenance.base_run_id` set. The base run must have `pipeline_input` stored in metadata (runs created with this version).
 
 ## Run System And Artifact Store
 
@@ -238,6 +296,12 @@ Milestone 3 adds audit-driven orchestration controls:
 - Runs stop early when confidence is below threshold and surface required additional inputs.
 - `TraceabilityMatrix` is generated as a canonical artifact.
 - `audits/audit_results.json` stores deterministic and semantic gate outcomes.
+
+### Derived Runs (Milestone 4)
+
+- `--base-run` and `--amendment-file` trigger a derived run.
+- Pipeline input is replayed from base run metadata; amendments are merged into `amended_context`.
+- All artifacts carry `provenance.base_run_id` for traceability.
 
 ## Architecture And Refactoring Plan
 

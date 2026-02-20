@@ -32,6 +32,7 @@ class ArtifactType(str, Enum):
     PRIVACY_CHECKLIST = "PrivacyChecklist"
     TEST_PLAN = "TestPlan"
     ACCEPTANCE_TESTS = "AcceptanceTests"
+    AMENDMENT = "Amendment"
 
 
 class ArtifactInputRef(BaseModel):
@@ -138,6 +139,15 @@ class AssumptionLedgerContent(ArtifactContentBase):
 
 class TradeoffRegisterContent(ArtifactContentBase):
     tradeoffs: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class AmendmentContent(ArtifactContentBase):
+    """Amendment artifact: references base run and amended assumptions/tradeoffs."""
+
+    base_run_id: str
+    amended_assumptions: List[Dict[str, Any]] = Field(default_factory=list)
+    amended_tradeoffs: List[Dict[str, Any]] = Field(default_factory=list)
+    reason: Optional[str] = None
 
 
 class InfoSufficiencyAssessmentContent(ArtifactContentBase):

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from agentic.artifacts.models import (
     AcceptanceTestsContent,
+    AmendmentContent,
     ArchitectureDecisionRecordSetContent,
     ArtifactType,
     AssumptionLedgerContent,
@@ -39,6 +40,7 @@ ARTIFACT_CONTENT_MODELS: Dict[ArtifactType, Type[BaseModel]] = {
     ArtifactType.TECH_STACK_RECOMMENDATION: TechStackRecommendationContent,
     ArtifactType.ASSUMPTION_LEDGER: AssumptionLedgerContent,
     ArtifactType.TRADEOFF_REGISTER: TradeoffRegisterContent,
+    ArtifactType.AMENDMENT: AmendmentContent,
     ArtifactType.INFO_SUFFICIENCY_ASSESSMENT: InfoSufficiencyAssessmentContent,
     ArtifactType.TRACEABILITY_MATRIX: TraceabilityMatrixContent,
     ArtifactType.IMPLEMENTABLE_SPEC: ImplementableSpecContent,

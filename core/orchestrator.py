@@ -93,6 +93,7 @@ class Orchestrator:
         run_id: Optional[str] = None,
         artifact_store: Optional[ArtifactStore] = None,
         collaboration_event_log: Optional[CollaborationEventLog] = None,
+        base_run_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute the configured pipeline with given input data.
@@ -150,6 +151,7 @@ class Orchestrator:
                     run_id=run_id,
                     artifact_type=ArtifactType.INFO_SUFFICIENCY_ASSESSMENT,
                     content=sufficiency_assessment.model_dump(mode="json"),
+                    base_run_id=base_run_id,
                 )
                 artifact_path = artifact_store.write_artifact(run_id, sufficiency_artifact)
                 if artifact_path:
@@ -272,6 +274,7 @@ class Orchestrator:
                         role_model_name=role_model_name,
                         agent_output=agent_output["output"],
                         prompt_templates_used=agent_output.get("prompt_templates_used", []),
+                        base_run_id=base_run_id,
                     )
                     artifact_path = artifact_store.write_artifact(run_id, artifact)
                     if artifact_path:
@@ -314,6 +317,7 @@ class Orchestrator:
                     run_id=run_id,
                     artifact_type=ArtifactType.TRACEABILITY_MATRIX,
                     content=traceability_matrix.model_dump(mode="json"),
+                    base_run_id=base_run_id,
                 )
                 traceability_path = artifact_store.write_artifact(run_id, traceability_artifact)
                 if traceability_path:
@@ -607,6 +611,7 @@ class Orchestrator:
         role_model_name: str,
         agent_output: Dict[str, Any],
         prompt_templates_used: List[str],
+        base_run_id: Optional[str] = None,
     ) -> Artifact:
         """Build canonical artifact for an agent output."""
         artifact_type = AGENT_ARTIFACT_MAP.get(agent_name, ArtifactType.BUSINESS_REQUIREMENTS)
@@ -626,6 +631,7 @@ class Orchestrator:
         )
         provenance = ArtifactProvenance(
             run_id=run_id,
+            base_run_id=base_run_id,
             created_at=datetime.now(timezone.utc).isoformat(),
             created_by_role=agent_name,
             created_by_agent_instance_id=str(uuid.uuid4()),
@@ -655,6 +661,7 @@ class Orchestrator:
         run_id: str,
         artifact_type: ArtifactType,
         content: Dict[str, Any],
+        base_run_id: Optional[str] = None,
     ) -> Artifact:
         """Build canonical artifact produced by orchestrator-level system checks."""
         identity = ArtifactIdentity(
@@ -664,6 +671,7 @@ class Orchestrator:
         )
         provenance = ArtifactProvenance(
             run_id=run_id,
+            base_run_id=base_run_id,
             created_at=datetime.now(timezone.utc).isoformat(),
             created_by_role="orchestrator",
             created_by_agent_instance_id=str(uuid.uuid4()),

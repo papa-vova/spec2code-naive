@@ -1,0 +1,54 @@
+{
+  "description": "Amendment artifact: references base run and amended assumptions/tradeoffs.",
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "base_run_id": {
+      "title": "Base Run Id",
+      "type": "string"
+    },
+    "amended_assumptions": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Amended Assumptions",
+      "type": "array"
+    },
+    "amended_tradeoffs": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Amended Tradeoffs",
+      "type": "array"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    }
+  },
+  "required": [
+    "base_run_id"
+  ],
+  "title": "AmendmentContent",
+  "type": "object"
+}

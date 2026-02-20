@@ -23,6 +23,15 @@ role_model_profiles:
     model: openai_gpt5_mini
   plan_critique_comparator:
     model: openai_gpt5_mini
+rate_limit:
+  max_retries: 6
+  initial_delay: 1.0
+  exponential_base: 2.0
+  use_header_reset: true
+  reset_header_names:
+    - x-ratelimit-reset-requests
+    - x-ratelimit-reset-tokens
+    - retry-after
 audit:
   min_confidence_to_proceed: 0.6
   min_input_size_for_sufficiency: 120

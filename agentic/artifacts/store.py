@@ -83,8 +83,10 @@ class ArtifactStore:
         execution_successful: bool,
         total_execution_time: float,
         artifacts_manifest: List[Dict[str, Any]],
+        pipeline_input: Optional[Dict[str, Any]] = None,
+        base_run_id: Optional[str] = None,
     ) -> Optional[Path]:
-        """Persist run metadata with artifact manifest."""
+        """Persist run metadata with artifact manifest and pipeline input for replay."""
         if not self.create_artifacts:
             return None
         run_dir = self.initialize_run(run_id)
@@ -99,6 +101,10 @@ class ArtifactStore:
             "total_execution_time": total_execution_time,
             "artifacts_manifest": artifacts_manifest,
         }
+        if pipeline_input is not None:
+            metadata["pipeline_input"] = pipeline_input
+        if base_run_id is not None:
+            metadata["base_run_id"] = base_run_id
         with open(metadata_path, "w", encoding="utf-8") as file_obj:
             json.dump(metadata, file_obj, indent=2, ensure_ascii=False)
         return metadata_path

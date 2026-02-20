@@ -235,13 +235,26 @@ flowchart LR
   audits --> report[audits/audit_results.json]
 ```
 
-### Milestone 4: Assumptions/Trade-Offs Amendment Loop And Derived Runs
+### Milestone 4: Assumptions/Trade-Offs Amendment Loop And Derived Runs -- COMPLETED
 
-Add `AssumptionLedger`, `TradeoffRegister`, and `Amendment` artifacts. Support derived runs that rehash dependent artifacts after amendments.
+Implemented:
 
-Exit criteria:
+- `AmendmentContent` artifact type with `base_run_id`, `amended_assumptions`, `amended_tradeoffs`.
+- `agentic/orchestration/derived_run.py`: `load_base_run_metadata`, `load_amendment`, `apply_amendment`, `run_derived_pipeline`.
+- CLI: `--base-run` and `--amendment-file` trigger derived run; pipeline input replayed from base metadata.
+- All derived-run artifacts carry `provenance.base_run_id`.
+- Metadata stores `pipeline_input` for replay.
+- Provider-agnostic rate limit handling in `agentic/runtime/rate_limit.py` (header-based wait, exponential backoff via tenacity).
 
-- A formal amendment triggers a derived run that deterministically recomputes dependent artifacts.
+```mermaid
+flowchart LR
+  baseRun[Base Run Artifacts] --> load[Load Base Run]
+  amendmentFile[Amendment JSON] --> load
+  load --> merge[Apply Amendments]
+  merge --> newRun[New Run ID]
+  newRun --> reExec[Re-execute Pipeline]
+  reExec --> persist[Persist With base_run_id]
+```
 
 ### Milestone 5: Performance And Data Model Quality Gates (3NF + Indexing)
 

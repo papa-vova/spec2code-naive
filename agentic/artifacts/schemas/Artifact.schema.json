@@ -124,7 +124,8 @@
         "ThreatModel",
         "PrivacyChecklist",
         "TestPlan",
-        "AcceptanceTests"
+        "AcceptanceTests",
+        "Amendment"
       ],
       "title": "ArtifactType",
       "type": "string"

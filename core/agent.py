@@ -7,23 +7,28 @@ from langchain_core.language_models.base import BaseLanguageModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 
-from config_system.config_loader import AgentConfig, PromptsConfig
+from agentic.runtime.rate_limit import invoke_with_rate_limit_retry
+from config_system.config_loader import AgentConfig, PromptsConfig, RateLimitConfig
 from logging_config import log_step_start, log_step_complete, log_error
 
 
 class Agent:
     """Generic agent that can be configured to perform different roles."""
-    
-    def __init__(self, 
-                 config: AgentConfig, 
-                 prompts: PromptsConfig, 
-                 llm: Optional[BaseLanguageModel] = None, 
-                 dry_run: bool = False):
+
+    def __init__(
+        self,
+        config: AgentConfig,
+        prompts: PromptsConfig,
+        llm: Optional[BaseLanguageModel] = None,
+        dry_run: bool = False,
+        rate_limit_config: Optional[RateLimitConfig] = None,
+    ):
         """Initialize agent with configuration."""
         self.config = config
         self.prompts = prompts
         self.llm = llm
         self.dry_run = dry_run
+        self.rate_limit_config = rate_limit_config or RateLimitConfig()
         self.logger = None
     
     def set_logger(self, logger):
@@ -190,8 +195,18 @@ class Agent:
             # Create the chain: LLM + output parser
             output_parser = StrOutputParser()
             chain = self.llm | output_parser
-            
-            response = chain.invoke(messages)
+
+            def _invoke() -> str:
+                return chain.invoke(messages)
+
+            response = invoke_with_rate_limit_retry(
+                _invoke,
+                max_retries=self.rate_limit_config.max_retries,
+                initial_delay=self.rate_limit_config.initial_delay,
+                exponential_base=self.rate_limit_config.exponential_base,
+                use_header_reset=self.rate_limit_config.use_header_reset,
+                reset_header_names=self.rate_limit_config.reset_header_names or None,
+            )
             
             # Return structured output with optional message capture
             result = {

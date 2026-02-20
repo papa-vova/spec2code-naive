@@ -90,6 +90,22 @@ class RoleModelProfile(BaseModel):
     model: str
 
 
+class RateLimitConfig(BaseModel):
+    """Configuration for rate limit retry behavior."""
+
+    max_retries: int = 6
+    initial_delay: float = 1.0
+    exponential_base: float = 2.0
+    use_header_reset: bool = True
+    reset_header_names: List[str] = Field(
+        default_factory=lambda: [
+            "x-ratelimit-reset-requests",
+            "x-ratelimit-reset-tokens",
+            "retry-after",
+        ]
+    )
+
+
 class AuditConfig(BaseModel):
     """Configuration for audit gates and sufficiency policies."""
 
@@ -103,6 +119,7 @@ class AgenticConfig(BaseModel):
     """Configuration for agentic role model profiles and audit policy."""
 
     role_model_profiles: Dict[str, RoleModelProfile]
+    rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     audit: AuditConfig = Field(default_factory=AuditConfig)
 
 
@@ -280,6 +297,10 @@ class ConfigLoader:
     def get_audit_config(self) -> AuditConfig:
         """Resolve configured audit policy."""
         return self.load_agentic_config().audit
+
+    def get_rate_limit_config(self) -> RateLimitConfig:
+        """Resolve configured rate limit retry policy."""
+        return self.load_agentic_config().rate_limit
 
     def get_min_confidence_to_proceed(self) -> float:
         """Resolve confidence threshold for orchestrator stop/proceed decisions."""

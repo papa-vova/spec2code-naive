@@ -10,6 +10,7 @@ from agentic.artifacts.models import ArtifactType
 from agentic.artifacts.store import ArtifactStore
 from agentic.artifacts.validation import validate_content, validate_envelope
 from agentic.collaboration.event_log import CollaborationEventLog
+from agentic.orchestration.derived_run import run_derived_pipeline
 from core.orchestrator import Orchestrator
 from config_system.config_loader import ConfigLoader
 from exceptions import PipelineError, InputError, FileNotFoundError, EmptyFileError
@@ -88,12 +89,12 @@ class Pipeline:
             self.artifact_store.write_metadata(
                 run_id=run_id,
                 config_root=self.config_root,
-                input_file=input_file
-                ,
+                input_file=input_file,
                 pipeline_name=result.get("pipeline_name", "unknown"),
                 execution_successful=result.get("execution_successful", False),
                 total_execution_time=result.get("metadata", {}).get("execution_time", 0),
                 artifacts_manifest=result.get("artifacts_manifest", []),
+                pipeline_input=input_data,
             )
             
             if self.logger:
@@ -145,8 +146,15 @@ def main():
         )
         parser.add_argument(
             '-i', '--input',
-            required=True,
-            help='Input file containing the feature description'
+            help='Input file containing the feature description (required for normal run)'
+        )
+        parser.add_argument(
+            '--base-run',
+            help='Base run ID for derived run (requires --amendment-file)'
+        )
+        parser.add_argument(
+            '--amendment-file',
+            help='Amendment JSON path for derived run (requires --base-run)'
         )
         parser.add_argument(
             '--log-level',
@@ -172,54 +180,86 @@ def main():
 
         
         args = parser.parse_args()
-        input_file = args.input
-        
+        base_run = getattr(args, 'base_run', None)
+        amendment_file = getattr(args, 'amendment_file', None)
+        if (base_run and not amendment_file) or (amendment_file and not base_run):
+            raise InputError("Both --base-run and --amendment-file are required for derived run.")
+        is_derived = bool(base_run and amendment_file)
+
         # Load pipeline configuration early to get the correct log level
         config_loader = ConfigLoader(args.config_root)
         pipeline_config = config_loader.load_pipeline_config()
-        
+
         # Set up logging using pipeline's log_level setting (not command line)
         pipeline_logger = setup_pipeline_logging(
             log_level=pipeline_config.settings.log_level,
             verbose=args.verbose
         )
         logger = pipeline_logger.get_logger("main")
-        
-        # Check if input file exists
-        if not os.path.exists(input_file):
-            raise FileNotFoundError(f"Input file '{input_file}' not found.")
-        
-        # Read input from file
-        try:
-            with open(input_file, 'r', encoding='utf-8') as f:
-                input_description = f.read().strip()
-            logger.info(f"Reading input from file: {input_file}", extra={
-                "component": "FileReader",
-                "data": {"file_path": input_file, "file_size": len(input_description)}
-            })
-        except IOError as e:
-            log_error(logger, f"Error reading file '{input_file}': {e}", "FileReader", e)
-            raise InputError(f"Error reading file '{input_file}': {e}")
-        
-        if not input_description:
-            raise EmptyFileError(f"Input file '{input_file}' is empty.")
-        
-        logger.info("Starting SPEC2CODE pipeline execution", extra={
-            "component": "Main",
-            "data": {"pipeline_type": "CONFIG_DRIVEN"}
-        })
-        
-        # Initialize and run pipeline
-        pipeline = Pipeline(config_root=args.config_root, dry_run=args.dry_run)
-        pipeline.set_logger(logger)
-        
-        # Log dry-run mode if active
-        if args.dry_run:
-            logger.info("Running in DRY-RUN mode - using dummy responses (no LLM required)", extra={
+
+        if is_derived:
+            # Derived run: load base run and amendment, re-execute pipeline
+            if not os.path.exists(amendment_file):
+                raise FileNotFoundError(f"Amendment file '{amendment_file}' not found.")
+            logger.info("Starting derived run", extra={
                 "component": "Main",
-                "data": {"mode": "dry_run"}
+                "data": {"base_run_id": base_run, "amendment_file": amendment_file}
             })
-        results = pipeline.run_pipeline(input_description, input_file)
+            pipeline = Pipeline(config_root=args.config_root, dry_run=args.dry_run)
+            pipeline.set_logger(logger)
+            if args.dry_run:
+                logger.info("Running in DRY-RUN mode", extra={
+                    "component": "Main",
+                    "data": {"mode": "dry_run"}
+                })
+            results = run_derived_pipeline(
+                artifact_store=pipeline.artifact_store,
+                orchestrator=pipeline.orchestrator,
+                base_run_id=base_run,
+                amendment_path=amendment_file,
+                config_root=args.config_root,
+            )
+            if pipeline.artifact_store.create_artifacts and results.get("execution_successful"):
+                pipeline._validate_artifacts(
+                    results["run_id"],
+                    results.get("artifacts_manifest", []),
+                )
+        else:
+            # Normal run: require input file
+            input_file = args.input
+            if not input_file:
+                raise InputError("Input file (-i/--input) is required for normal run.")
+            if not os.path.exists(input_file):
+                raise FileNotFoundError(f"Input file '{input_file}' not found.")
+
+            try:
+                with open(input_file, 'r', encoding='utf-8') as f:
+                    input_description = f.read().strip()
+                logger.info("Reading input from file", extra={
+                    "component": "FileReader",
+                    "data": {"file_path": input_file, "file_size": len(input_description)}
+                })
+            except IOError as e:
+                log_error(logger, f"Error reading file '{input_file}': {e}", "FileReader", e)
+                raise InputError(f"Error reading file '{input_file}': {e}") from e
+
+            if not input_description:
+                raise EmptyFileError(f"Input file '{input_file}' is empty.")
+
+            logger.info("Starting SPEC2CODE pipeline execution", extra={
+                "component": "Main",
+                "data": {"pipeline_type": "CONFIG_DRIVEN"}
+            })
+
+            pipeline = Pipeline(config_root=args.config_root, dry_run=args.dry_run)
+            pipeline.set_logger(logger)
+
+            if args.dry_run:
+                logger.info("Running in DRY-RUN mode - using dummy responses (no LLM required)", extra={
+                    "component": "Main",
+                    "data": {"mode": "dry_run"}
+                })
+            results = pipeline.run_pipeline(input_description, input_file)
         
         # TODO: Generate artifacts (files, reports, etc.) instead of console output
         # For now, the application runs silently and relies on JSON logs for monitoring
