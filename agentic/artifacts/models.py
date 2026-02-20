@@ -22,6 +22,7 @@ class ArtifactType(str, Enum):
     ASSUMPTION_LEDGER = "AssumptionLedger"
     TRADEOFF_REGISTER = "TradeoffRegister"
     INFO_SUFFICIENCY_ASSESSMENT = "InfoSufficiencyAssessment"
+    TRACEABILITY_MATRIX = "TraceabilityMatrix"
     IMPLEMENTABLE_SPEC = "ImplementableSpec"
     IMPLEMENTATION_DESIGN = "ImplementationDesign"
     WORK_BREAKDOWN = "WorkBreakdown"
@@ -142,6 +143,13 @@ class TradeoffRegisterContent(ArtifactContentBase):
 class InfoSufficiencyAssessmentContent(ArtifactContentBase):
     confidence_score: Optional[float] = None
     blocking_gaps: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class TraceabilityMatrixContent(ArtifactContentBase):
+    rows: List[str] = Field(default_factory=list)
+    columns: List[str] = Field(default_factory=list)
+    cells: Dict[str, List[str]] = Field(default_factory=dict)
+    gaps: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class ImplementableSpecContent(ArtifactContentBase):

@@ -212,13 +212,28 @@ Remaining scope for later milestones:
 
 - Interactive Product Owner stakeholder Q/A loop and production use of `stakeholder_question_asked` / `stakeholder_answer_received`.
 
-### Milestone 3: Semantic-Driven Audits, Confidence, And Stop Logic
+### Milestone 3: Semantic-Driven Audits, Confidence, And Stop Logic -- COMPLETED
 
-Implement deterministic audits, `TraceabilityMatrix`, rubric-based semantic audits, and `InfoSufficiencyAssessment` with configurable confidence thresholds.
+Implemented:
 
-Exit criteria:
+- `agentic/audits/` package (`checks.py`, `gates.py`, `rubric_eval.py`, `traceability.py`).
+- Intake `InfoSufficiencyAssessment` generation with configurable confidence threshold from `config/agentic.yaml`.
+- Orchestrator early-stop flow when confidence is below threshold, with `blocking_gaps` included in run result.
+- Deterministic audit execution and persisted audit report at `runs/<run_id>/audits/audit_results.json`.
+- `TraceabilityMatrix` artifact generation and persistence.
+- Collaboration events for audit gate outcomes (`audit_gate_passed`, `audit_gate_failed`).
+- Tests: `test_audits.py` covering deterministic checks, sufficiency logic, traceability matrix, audit storage, config threshold resolution, and stop behavior.
 
-- The orchestrator stops when information is insufficient and can explain which additional stakeholder inputs are needed.
+```mermaid
+flowchart LR
+  intake[Intake] --> sufficiency[InfoSufficiencyAssessment]
+  sufficiency --> decision{Confidence >= Threshold}
+  decision -->|No| stop[Stop Run With Blocking Gaps]
+  decision -->|Yes| agents[Execute Agents]
+  agents --> trace[Generate TraceabilityMatrix]
+  trace --> audits[Run Deterministic And Semantic Audits]
+  audits --> report[audits/audit_results.json]
+```
 
 ### Milestone 4: Assumptions/Trade-Offs Amendment Loop And Derived Runs
 

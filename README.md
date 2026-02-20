@@ -8,6 +8,8 @@ Multi-agent LangChain pipeline that transforms rough feature descriptions into f
 - Each agent produces a **typed artifact** stored as a separate JSON file under `runs/<run_id>/artifacts/`.
 - Every artifact carries an **envelope** (identity, provenance, quality metadata, content hash) validated at write time.
 - **Per-role model profiles** in `config/agentic.yaml` control which LLM each role uses.
+- The orchestrator runs an information sufficiency gate and can stop runs below confidence threshold.
+- Deterministic and semantic audit results are persisted under `runs/<run_id>/audits/audit_results.json`.
 - Collaboration artifacts are stored separately under `runs/<run_id>/collaboration/`.
 - Operational logs go to `stderr` (JSON, content-free).
 - Exit codes: 0 = success, 1 = failure.
@@ -19,6 +21,7 @@ spec2code-naive/
   main.py                          # CLI entry point
   test_artifacts.py                # Artifact system tests
   test_collaboration.py            # Collaboration artifact tests
+  test_audits.py                   # Audit gate and stop-logic tests
   test_runtime.py                  # Pipeline regression tests
   test_config.py                   # Config validation tool
   requirements.txt                 # Python dependencies
@@ -31,13 +34,18 @@ spec2code-naive/
       registry.py                  # ArtifactType -> content model mapping
       store.py                     # ArtifactStore (run dirs, read/write)
       validation.py                # Envelope (hard gate) + content (soft gate)
-      schemas/                     # Generated JSON Schema files (19 files)
+      schemas/                     # Generated JSON Schema files (20 files)
     collaboration/
       models.py                    # Collaboration event models
       event_log.py                 # JSONL event log writer/reader
       transcript_store.py          # Stakeholder transcript/content store
       schemas/
         CollaborationEvent.schema.json
+    audits/
+      checks.py                    # Deterministic audit checks
+      gates.py                     # Sufficiency + audit gate runners
+      rubric_eval.py               # Semantic evaluator interface
+      traceability.py              # Traceability matrix generator
   core/
     agent.py                       # Agent execution (LangChain)
     orchestrator.py                # Pipeline orchestration + artifact wrapping
@@ -64,6 +72,8 @@ spec2code-naive/
       metadata.json                # Run metadata + artifacts manifest
       artifacts/
         BusinessRequirements.json  # Typed artifact with envelope
+      audits/
+        audit_results.json         # Deterministic + semantic audit outputs
   docs/
     spec2code-naive raw initial plan.md
 ```
@@ -99,6 +109,9 @@ export OPENAI_API_KEY="your-key"
 # Collaboration artifact tests
 .venv/bin/python -m unittest test_collaboration.py
 
+# Audit gate tests
+.venv/bin/python -m unittest test_audits.py
+
 # Pipeline regression tests
 .venv/bin/python test_runtime.py
 
@@ -108,6 +121,7 @@ export OPENAI_API_KEY="your-key"
 # Full regression gate
 .venv/bin/python -m unittest test_artifacts.py \
   && .venv/bin/python -m unittest test_collaboration.py \
+  && .venv/bin/python -m unittest test_audits.py \
   && .venv/bin/python test_runtime.py \
   && .venv/bin/python test_config.py validate
 ```
@@ -151,6 +165,8 @@ runs/<run_id>/
   collaboration/
     collaboration_events.jsonl
     stakeholder_transcript.txt
+  audits/
+    audit_results.json
 ```
 
 ### Metadata File
@@ -212,6 +228,16 @@ Milestone 2 introduces run-scoped collaboration artifacts:
 - `collaboration_events.jsonl`: append-only event stream (`orchestrator_decision_made`, `artifact_produced`, and future stakeholder events).
 - `stakeholder_transcript.txt`: plain-file transcript storage for Product Owner and stakeholder interaction content.
 - Events store references and hashes; operational logs remain content-free.
+
+### Audit Gates And Stop Logic
+
+Milestone 3 adds audit-driven orchestration controls:
+
+- `InfoSufficiencyAssessment` is generated at intake with `confidence_score` and `blocking_gaps`.
+- Confidence threshold is configurable in `config/agentic.yaml` via `audit.min_confidence_to_proceed`.
+- Runs stop early when confidence is below threshold and surface required additional inputs.
+- `TraceabilityMatrix` is generated as a canonical artifact.
+- `audits/audit_results.json` stores deterministic and semantic gate outcomes.
 
 ## Architecture And Refactoring Plan
 

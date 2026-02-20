@@ -2,11 +2,18 @@
 Configuration-driven orchestrator for executing agent pipelines.
 Replaces hardcoded pipeline logic with configurable agent sequences.
 """
+import json
 import time
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
+from agentic.audits.gates import (
+    run_deterministic_audit,
+    run_semantic_audit,
+    run_sufficiency_evaluation,
+)
+from agentic.audits.traceability import build_traceability_matrix
 from agentic.artifacts.models import (
     Artifact,
     ArtifactIdentity,
@@ -119,6 +126,9 @@ class Orchestrator:
             }
         }
         artifacts_manifest: List[Dict[str, Any]] = []
+        audit_config = self.config_loader.get_audit_config()
+        confidence_threshold = audit_config.min_confidence_to_proceed
+
         if collaboration_event_log and run_id:
             self._emit_collaboration_event(
                 collaboration_event_log=collaboration_event_log,
@@ -130,6 +140,84 @@ class Orchestrator:
             )
         
         try:
+            sufficiency_assessment = run_sufficiency_evaluation(
+                pipeline_input=input_data,
+                min_content_size=audit_config.min_input_size_for_sufficiency,
+                insufficient_markers=audit_config.insufficient_markers,
+            )
+            if artifact_store and run_id:
+                sufficiency_artifact = self._build_system_artifact(
+                    run_id=run_id,
+                    artifact_type=ArtifactType.INFO_SUFFICIENCY_ASSESSMENT,
+                    content=sufficiency_assessment.model_dump(mode="json"),
+                )
+                artifact_path = artifact_store.write_artifact(run_id, sufficiency_artifact)
+                if artifact_path:
+                    self._append_manifest_entry(
+                        artifacts_manifest=artifacts_manifest,
+                        run_id=run_id,
+                        artifact_store=artifact_store,
+                        artifact=sufficiency_artifact,
+                        artifact_path=artifact_path,
+                    )
+
+            confidence_score = sufficiency_assessment.confidence_score or 0.0
+            if confidence_score < confidence_threshold:
+                if artifact_store and run_id:
+                    artifact_store.write_audit_results(
+                        run_id,
+                        {
+                            "deterministic": {"passed": True, "errors": [], "results": {}},
+                            "semantic": {
+                                "confidence_score": confidence_score,
+                                "blocking_gaps": sufficiency_assessment.blocking_gaps,
+                                "evidence_refs": [],
+                                "rubric_ref": audit_config.sufficiency_rubric,
+                            },
+                            "sufficiency": sufficiency_assessment.model_dump(mode="json"),
+                            "traceability_matrix_ref": None,
+                        },
+                    )
+                if collaboration_event_log and run_id:
+                    self._emit_collaboration_event(
+                        collaboration_event_log=collaboration_event_log,
+                        run_id=run_id,
+                        actor="orchestrator",
+                        event_type=CollaborationEventType.AUDIT_GATE_FAILED,
+                        references=[ArtifactType.INFO_SUFFICIENCY_ASSESSMENT.value],
+                        summary="Sufficiency audit failed",
+                    )
+                    self._emit_collaboration_event(
+                        collaboration_event_log=collaboration_event_log,
+                        run_id=run_id,
+                        actor="orchestrator",
+                        event_type=CollaborationEventType.ORCHESTRATOR_DECISION_MADE,
+                        references=[ArtifactType.INFO_SUFFICIENCY_ASSESSMENT.value],
+                        summary="Pipeline stopped: insufficient information",
+                    )
+                return {
+                    "pipeline_name": self.pipeline_config.name,
+                    "execution_successful": False,
+                    "pipeline_input": pipeline_data["pipeline_input"],
+                    "agents": {},
+                    "metadata": {
+                        **pipeline_data["metadata"],
+                        "execution_time": (time.time() - pipeline_start_time) * 1000,
+                        "blocking_gaps": sufficiency_assessment.blocking_gaps,
+                    },
+                    "artifacts_manifest": artifacts_manifest,
+                }
+
+            if collaboration_event_log and run_id:
+                self._emit_collaboration_event(
+                    collaboration_event_log=collaboration_event_log,
+                    run_id=run_id,
+                    actor="orchestrator",
+                    event_type=CollaborationEventType.AUDIT_GATE_PASSED,
+                    references=[ArtifactType.INFO_SUFFICIENCY_ASSESSMENT.value],
+                    summary="Sufficiency audit passed",
+                )
+
             # Execute agents in sequence
             for i, agent_config in enumerate(self.pipeline_config.agents):
                 agent_start_time = time.time()
@@ -187,12 +275,12 @@ class Orchestrator:
                     )
                     artifact_path = artifact_store.write_artifact(run_id, artifact)
                     if artifact_path:
-                        artifacts_manifest.append(
-                            {
-                                "artifact_type": artifact.identity.artifact_type.value,
-                                "file": str(artifact_path.relative_to(artifact_store.get_run_directory(run_id))),
-                                "content_hash": artifact.content_hash,
-                            }
+                        self._append_manifest_entry(
+                            artifacts_manifest=artifacts_manifest,
+                            run_id=run_id,
+                            artifact_store=artifact_store,
+                            artifact=artifact,
+                            artifact_path=artifact_path,
                         )
                         if collaboration_event_log:
                             self._emit_collaboration_event(
@@ -203,7 +291,7 @@ class Orchestrator:
                                 references=[artifact.identity.artifact_id, artifact.content_hash],
                                 summary=f"Artifact {artifact.identity.artifact_type.value} produced",
                             )
-                
+
                 if self.logger:
                     log_step_complete(
                         self.logger,
@@ -212,11 +300,99 @@ class Orchestrator:
                         f"Agent {agent_config.name} completed successfully",
                         {
                             "agent_name": agent_config.name,
-                            "output_keys": list(agent_output["output"].keys()) if isinstance(agent_output["output"], dict) else ["scalar"]
+                            "output_keys": list(agent_output["output"].keys())
+                            if isinstance(agent_output["output"], dict)
+                            else ["scalar"],
                         },
-                        pipeline_data["agents"][agent_config.name]["metadata"]["execution_time"]
+                        pipeline_data["agents"][agent_config.name]["metadata"]["execution_time"],
                     )
-            
+
+            traceability_matrix_ref: Optional[str] = None
+            if artifact_store and run_id:
+                traceability_matrix = build_traceability_matrix(artifact_store, run_id)
+                traceability_artifact = self._build_system_artifact(
+                    run_id=run_id,
+                    artifact_type=ArtifactType.TRACEABILITY_MATRIX,
+                    content=traceability_matrix.model_dump(mode="json"),
+                )
+                traceability_path = artifact_store.write_artifact(run_id, traceability_artifact)
+                if traceability_path:
+                    traceability_matrix_ref = str(
+                        traceability_path.relative_to(artifact_store.get_run_directory(run_id))
+                    )
+                    self._append_manifest_entry(
+                        artifacts_manifest=artifacts_manifest,
+                        run_id=run_id,
+                        artifact_store=artifact_store,
+                        artifact=traceability_artifact,
+                        artifact_path=traceability_path,
+                    )
+                    if collaboration_event_log:
+                        self._emit_collaboration_event(
+                            collaboration_event_log=collaboration_event_log,
+                            run_id=run_id,
+                            actor="orchestrator",
+                            event_type=CollaborationEventType.ARTIFACT_PRODUCED,
+                            references=[
+                                traceability_artifact.identity.artifact_id,
+                                traceability_artifact.content_hash,
+                            ],
+                            summary=f"Artifact {traceability_artifact.identity.artifact_type.value} produced",
+                        )
+
+            audit_results = {"passed": True, "errors": [], "results": {}}
+            semantic_results = {
+                "confidence_score": 1.0,
+                "blocking_gaps": [],
+                "evidence_refs": [],
+                "rubric_ref": audit_config.sufficiency_rubric,
+            }
+            if artifact_store and run_id:
+                contents = self._collect_artifact_contents(artifact_store, run_id)
+                audit_results = run_deterministic_audit(contents)
+                semantic_results = run_semantic_audit(contents, audit_config.sufficiency_rubric)
+
+                artifact_store.write_audit_results(
+                    run_id,
+                    {
+                        "deterministic": audit_results,
+                        "semantic": semantic_results,
+                        "sufficiency": sufficiency_assessment.model_dump(mode="json"),
+                        "traceability_matrix_ref": traceability_matrix_ref,
+                    },
+                )
+                if collaboration_event_log:
+                    self._emit_collaboration_event(
+                        collaboration_event_log=collaboration_event_log,
+                        run_id=run_id,
+                        actor="orchestrator",
+                        event_type=(
+                            CollaborationEventType.AUDIT_GATE_PASSED
+                            if audit_results.get("passed")
+                            else CollaborationEventType.AUDIT_GATE_FAILED
+                        ),
+                        references=["audits/audit_results.json"],
+                        summary=(
+                            "Deterministic audit passed"
+                            if audit_results.get("passed")
+                            else "Deterministic audit failed"
+                        ),
+                    )
+                if not audit_results.get("passed"):
+                    raise PipelineError("Deterministic audit failed.")
+                semantic_confidence = float(semantic_results.get("confidence_score", 1.0))
+                if semantic_confidence < confidence_threshold:
+                    if collaboration_event_log:
+                        self._emit_collaboration_event(
+                            collaboration_event_log=collaboration_event_log,
+                            run_id=run_id,
+                            actor="orchestrator",
+                            event_type=CollaborationEventType.AUDIT_GATE_FAILED,
+                            references=["audits/audit_results.json"],
+                            summary="Semantic audit confidence below threshold",
+                        )
+                    raise PipelineError("Semantic audit confidence below threshold.")
+                
             # Prepare final result
             total_execution_time = (time.time() - pipeline_start_time) * 1000
             pipeline_data["metadata"]["execution_time"] = total_execution_time
@@ -256,6 +432,23 @@ class Orchestrator:
             if self.logger:
                 log_error(self.logger, f"Pipeline execution failed: {str(e)}", "Orchestrator", e)
             raise PipelineError(f"Pipeline execution failed: {str(e)}")
+
+    def _append_manifest_entry(
+        self,
+        artifacts_manifest: List[Dict[str, Any]],
+        run_id: str,
+        artifact_store: ArtifactStore,
+        artifact: Artifact,
+        artifact_path,
+    ) -> None:
+        """Append one artifact entry to run manifest."""
+        artifacts_manifest.append(
+            {
+                "artifact_type": artifact.identity.artifact_type.value,
+                "file": str(artifact_path.relative_to(artifact_store.get_run_directory(run_id))),
+                "content_hash": artifact.content_hash,
+            }
+        )
 
     def _emit_collaboration_event(
         self,
@@ -298,6 +491,23 @@ class Orchestrator:
         if self.logger:
             agent.set_logger(self.logger)
         return agent
+
+    def _collect_artifact_contents(
+        self,
+        artifact_store: ArtifactStore,
+        run_id: str,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Load all current artifact contents for audit checks."""
+        contents: Dict[str, Dict[str, Any]] = {}
+        artifacts_dir = artifact_store.get_run_directory(run_id) / "artifacts"
+        for artifact_path in artifacts_dir.glob("*.json"):
+            with open(artifact_path, "r", encoding="utf-8") as file_obj:
+                payload = json.load(file_obj)
+            artifact_type = payload.get("identity", {}).get("artifact_type")
+            content = payload.get("content")
+            if isinstance(artifact_type, str) and isinstance(content, dict):
+                contents[artifact_type] = content
+        return contents
 
     def _resolve_role_model(self, role_name: str) -> str:
         """Resolve role model profile for the configured role."""
@@ -438,4 +648,40 @@ class Orchestrator:
             content=agent_output,
             quality_metadata=quality,
             content_hash=content_hash,
+        )
+
+    def _build_system_artifact(
+        self,
+        run_id: str,
+        artifact_type: ArtifactType,
+        content: Dict[str, Any],
+    ) -> Artifact:
+        """Build canonical artifact produced by orchestrator-level system checks."""
+        identity = ArtifactIdentity(
+            artifact_id=artifact_type.value,
+            artifact_type=artifact_type,
+            schema_version="1.0.0",
+        )
+        provenance = ArtifactProvenance(
+            run_id=run_id,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            created_by_role="orchestrator",
+            created_by_agent_instance_id=str(uuid.uuid4()),
+            model_config_ref=ModelConfigRef(
+                provider="system",
+                model_name="rule_based",
+                parameters={},
+            ),
+            role_model_profile_id="orchestrator",
+            prompt_ref=PromptRef(
+                template_name="system",
+                template_version="m3",
+            ),
+        )
+        return Artifact(
+            identity=identity,
+            provenance=provenance,
+            content=content,
+            quality_metadata=QualityMetadata(),
+            content_hash=compute_content_hash(content),
         )

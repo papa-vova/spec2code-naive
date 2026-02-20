@@ -115,6 +115,7 @@
         "AssumptionLedger",
         "TradeoffRegister",
         "InfoSufficiencyAssessment",
+        "TraceabilityMatrix",
         "ImplementableSpec",
         "ImplementationDesign",
         "WorkBreakdown",

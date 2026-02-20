@@ -46,11 +46,16 @@ class ArtifactStore:
         run_dir = self.get_run_directory(run_id)
         (run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
         (run_dir / "collaboration").mkdir(parents=True, exist_ok=True)
+        (run_dir / "audits").mkdir(parents=True, exist_ok=True)
         return run_dir
 
     def get_collaboration_dir(self, run_id: str) -> Path:
         """Return run collaboration directory path for run ID."""
         return self.get_run_directory(run_id) / "collaboration"
+
+    def get_audits_dir(self, run_id: str) -> Path:
+        """Return run audit directory path for run ID."""
+        return self.get_run_directory(run_id) / "audits"
 
     def write_artifact(self, run_id: str, artifact: Artifact) -> Optional[Path]:
         """Persist artifact JSON under run artifacts folder."""
@@ -97,4 +102,14 @@ class ArtifactStore:
         with open(metadata_path, "w", encoding="utf-8") as file_obj:
             json.dump(metadata, file_obj, indent=2, ensure_ascii=False)
         return metadata_path
+
+    def write_audit_results(self, run_id: str, results: Dict[str, Any]) -> Optional[Path]:
+        """Persist audit results under run audits folder."""
+        if not self.create_artifacts:
+            return None
+        run_dir = self.initialize_run(run_id)
+        audit_path = run_dir / "audits" / "audit_results.json"
+        with open(audit_path, "w", encoding="utf-8") as file_obj:
+            json.dump(results, file_obj, indent=2, ensure_ascii=False)
+        return audit_path
 

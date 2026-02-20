@@ -191,7 +191,17 @@ class TestRoleProfilesAndIntegration(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "agentic.yaml").write_text(
-            yaml.safe_dump({"role_model_profiles": {"test_role": {"model": "test_model"}}}),
+            yaml.safe_dump(
+                {
+                    "role_model_profiles": {"test_role": {"model": "test_model"}},
+                    "audit": {
+                        "min_confidence_to_proceed": 0.5,
+                        "min_input_size_for_sufficiency": 1,
+                        "insufficient_markers": ["TBD", "TODO"],
+                        "sufficiency_rubric": None,
+                    },
+                }
+            ),
             encoding="utf-8",
         )
 

@@ -104,7 +104,18 @@ class TestUnifiedDataStructure(unittest.TestCase):
             for agent in agents_config
         }
         with open(self.config_root / "agentic.yaml", "w") as f:
-            yaml.dump({"role_model_profiles": role_profiles}, f)
+            yaml.dump(
+                {
+                    "role_model_profiles": role_profiles,
+                    "audit": {
+                        "min_confidence_to_proceed": 0.5,
+                        "min_input_size_for_sufficiency": 1,
+                        "insufficient_markers": ["TBD", "TODO"],
+                        "sufficiency_rubric": None,
+                    },
+                },
+                f,
+            )
     
     def test_pipeline_agent_config_single_input(self):
         """Test PipelineAgentConfig with single input."""

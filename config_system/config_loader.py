@@ -6,7 +6,7 @@ import yaml
 import os
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 
@@ -90,10 +90,20 @@ class RoleModelProfile(BaseModel):
     model: str
 
 
+class AuditConfig(BaseModel):
+    """Configuration for audit gates and sufficiency policies."""
+
+    min_confidence_to_proceed: float = 0.6
+    min_input_size_for_sufficiency: int = 120
+    insufficient_markers: List[str] = Field(default_factory=lambda: ["TBD", "TODO"])
+    sufficiency_rubric: Optional[str] = None
+
+
 class AgenticConfig(BaseModel):
-    """Configuration for agentic role model profiles."""
+    """Configuration for agentic role model profiles and audit policy."""
 
     role_model_profiles: Dict[str, RoleModelProfile]
+    audit: AuditConfig = Field(default_factory=AuditConfig)
 
 
 class ConfigValidationError(Exception):
@@ -266,6 +276,14 @@ class ConfigLoader:
         if role_name not in agentic.role_model_profiles:
             raise ConfigValidationError(f"Role model profile not found for role: {role_name}")
         return agentic.role_model_profiles[role_name].model
+
+    def get_audit_config(self) -> AuditConfig:
+        """Resolve configured audit policy."""
+        return self.load_agentic_config().audit
+
+    def get_min_confidence_to_proceed(self) -> float:
+        """Resolve confidence threshold for orchestrator stop/proceed decisions."""
+        return self.get_audit_config().min_confidence_to_proceed
 
     def create_chat_prompt_template(self, agent_name: str, template_name: str = "default") -> ChatPromptTemplate:
         """Create LangChain ChatPromptTemplate from configuration."""

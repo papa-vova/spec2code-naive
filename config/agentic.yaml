@@ -23,3 +23,10 @@ role_model_profiles:
     model: openai_gpt5_mini
   plan_critique_comparator:
     model: openai_gpt5_mini
+audit:
+  min_confidence_to_proceed: 0.6
+  min_input_size_for_sufficiency: 120
+  insufficient_markers:
+    - TBD
+    - TODO
+  sufficiency_rubric: null
