@@ -72,3 +72,75 @@ def check_consistency(artifacts: Dict[str, Dict[str, Any]]) -> List[str]:
 
     return errors
 
+
+def check_3nf_data_structures(
+    artifacts: Dict[str, Dict[str, Any]], require_3nf: bool
+) -> List[str]:
+    """Verify 3NF data structures when ImplementationDesign exists and require_3nf is true."""
+    errors: List[str] = []
+    if not require_3nf:
+        return errors
+
+    impl_design = artifacts.get("ImplementationDesign", {})
+    if not impl_design:
+        return errors
+
+    data_structures = impl_design.get("data_structures", [])
+    if not isinstance(data_structures, list):
+        errors.append("ImplementationDesign.data_structures must be a list.")
+        return errors
+
+    if len(data_structures) == 0:
+        errors.append("ImplementationDesign must include at least one data_structures entry when require_3nf_data_structures is enabled.")
+        return errors
+
+    for i, entry in enumerate(data_structures):
+        if not isinstance(entry, dict):
+            errors.append(f"ImplementationDesign.data_structures[{i}] must be an object.")
+            continue
+        norm_level = entry.get("normalization_level")
+        if not norm_level:
+            errors.append(f"ImplementationDesign.data_structures[{i}] missing normalization_level.")
+        elif str(norm_level).upper() != "3NF":
+            rationale = entry.get("denormalization_rationale")
+            if not rationale or not str(rationale).strip():
+                errors.append(
+                    f"ImplementationDesign.data_structures[{i}] has normalization_level '{norm_level}' "
+                    "but missing denormalization_rationale."
+                )
+
+    return errors
+
+
+def check_performance_guidance(
+    artifacts: Dict[str, Dict[str, Any]], require_performance: bool
+) -> List[str]:
+    """Verify performance guidance when ImplementationDesign exists and require_performance is true."""
+    errors: List[str] = []
+    if not require_performance:
+        return errors
+
+    impl_design = artifacts.get("ImplementationDesign", {})
+    if not impl_design:
+        return errors
+
+    perf_guidance = impl_design.get("performance_guidance", [])
+    modules = impl_design.get("modules", [])
+    if not isinstance(perf_guidance, list):
+        perf_guidance = []
+    if not isinstance(modules, list):
+        modules = []
+
+    has_perf_entries = len(perf_guidance) > 0
+    modules_with_complexity = sum(
+        1 for m in modules if isinstance(m, dict) and m.get("complexity")
+    )
+
+    if not has_perf_entries and modules_with_complexity == 0:
+        errors.append(
+            "ImplementationDesign must include performance_guidance entries or module-level complexity "
+            "when require_performance_guidance is enabled."
+        )
+
+    return errors
+

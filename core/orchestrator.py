@@ -353,7 +353,7 @@ class Orchestrator:
             }
             if artifact_store and run_id:
                 contents = self._collect_artifact_contents(artifact_store, run_id)
-                audit_results = run_deterministic_audit(contents)
+                audit_results = run_deterministic_audit(contents, audit_config)
                 semantic_results = run_semantic_audit(contents, audit_config.sufficiency_rubric)
 
                 artifact_store.write_audit_results(

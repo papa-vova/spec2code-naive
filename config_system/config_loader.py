@@ -113,6 +113,8 @@ class AuditConfig(BaseModel):
     min_input_size_for_sufficiency: int = 120
     insufficient_markers: List[str] = Field(default_factory=lambda: ["TBD", "TODO"])
     sufficiency_rubric: Optional[str] = None
+    require_3nf_data_structures: bool = False
+    require_performance_guidance: bool = False
 
 
 class AgenticConfig(BaseModel):

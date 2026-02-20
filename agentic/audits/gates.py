@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from agentic.audits.checks import check_completeness, check_consistency, check_traceability
+from agentic.audits.checks import (
+    check_3nf_data_structures,
+    check_completeness,
+    check_consistency,
+    check_performance_guidance,
+    check_traceability,
+)
 from agentic.audits.rubric_eval import DefaultSemanticEvaluator
 from agentic.artifacts.models import InfoSufficiencyAssessmentContent
 
@@ -51,30 +57,51 @@ def run_sufficiency_evaluation(
     )
 
 
-def run_deterministic_audit(artifacts: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+def run_deterministic_audit(
+    artifacts: Dict[str, Dict[str, Any]],
+    audit_config: Optional[Any] = None,
+) -> Dict[str, Any]:
     """Run deterministic audit checks across produced artifacts."""
     errors: List[str] = []
     per_artifact_completeness: Dict[str, List[str]] = {}
+    results: Dict[str, Any] = {
+        "traceability": [],
+        "consistency": [],
+        "completeness": {},
+        "three_nf": [],
+        "performance_guidance": [],
+    }
 
     traceability_errors = check_traceability(artifacts)
     consistency_errors = check_consistency(artifacts)
     errors.extend(traceability_errors)
     errors.extend(consistency_errors)
+    results["traceability"] = traceability_errors
+    results["consistency"] = consistency_errors
 
     for artifact_type, content in artifacts.items():
         completeness_errors = check_completeness(content)
         if completeness_errors:
             per_artifact_completeness[artifact_type] = completeness_errors
             errors.extend([f"{artifact_type}: {entry}" for entry in completeness_errors])
+    results["completeness"] = per_artifact_completeness
+
+    if audit_config:
+        three_nf_errors = check_3nf_data_structures(
+            artifacts, getattr(audit_config, "require_3nf_data_structures", False)
+        )
+        perf_errors = check_performance_guidance(
+            artifacts, getattr(audit_config, "require_performance_guidance", False)
+        )
+        results["three_nf"] = three_nf_errors
+        results["performance_guidance"] = perf_errors
+        errors.extend(three_nf_errors)
+        errors.extend(perf_errors)
 
     return {
         "passed": len(errors) == 0,
         "errors": errors,
-        "results": {
-            "traceability": traceability_errors,
-            "consistency": consistency_errors,
-            "completeness": per_artifact_completeness,
-        },
+        "results": results,
     }
 
 

@@ -39,3 +39,5 @@ audit:
     - TBD
     - TODO
   sufficiency_rubric: null
+  require_3nf_data_structures: false
+  require_performance_guidance: false

@@ -166,9 +166,34 @@ class ImplementableSpecContent(ArtifactContentBase):
     requirements: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+class DataStructureEntry(BaseModel):
+    """Data structure with normalization level for 3NF audit."""
+
+    id: str
+    name: str
+    attributes: List[Dict[str, Any]] = Field(default_factory=list)  # [{name, type}, ...]
+    normalization_level: str  # 1NF, 2NF, 3NF
+    denormalization_rationale: Optional[str] = None  # Required if not 3NF
+    assumption_refs: List[str] = Field(default_factory=list)  # ASM-* links
+
+
+class PerformanceGuidanceEntry(BaseModel):
+    """Performance guidance for a flow or module."""
+
+    flow_id: Optional[str] = None
+    module_id: Optional[str] = None
+    complexity: Optional[str] = None  # Big-O e.g. "O(n log n)"
+    indexing_recommendations: List[Dict[str, Any]] = Field(default_factory=list)  # [{field, rationale}]
+    cardinality_assumptions: Optional[str] = None
+    hot_paths: List[str] = Field(default_factory=list)
+    mitigations: List[str] = Field(default_factory=list)
+
+
 class ImplementationDesignContent(ArtifactContentBase):
     modules: List[Dict[str, Any]] = Field(default_factory=list)
     algorithms: List[Dict[str, Any]] = Field(default_factory=list)
+    data_structures: List[Dict[str, Any]] = Field(default_factory=list)  # DataStructureEntry shape
+    performance_guidance: List[Dict[str, Any]] = Field(default_factory=list)  # PerformanceGuidanceEntry shape
 
 
 class WorkBreakdownContent(ArtifactContentBase):

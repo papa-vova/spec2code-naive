@@ -27,6 +27,22 @@
       },
       "title": "Algorithms",
       "type": "array"
+    },
+    "data_structures": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Data Structures",
+      "type": "array"
+    },
+    "performance_guidance": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Performance Guidance",
+      "type": "array"
     }
   },
   "title": "ImplementationDesignContent",

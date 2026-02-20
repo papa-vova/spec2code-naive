@@ -55,3 +55,12 @@ prompt_templates:
     - Blocking relationships
     - Parallel execution opportunities
     - Dependency risk assessment
+    
+  data_model_quality: |
+    Implementation Plan:
+    {plan}
+    
+    Analyze this plan for data model and performance quality, focusing on:
+    - 3NF compliance: are data structures in 3NF? If denormalized, is denormalization_rationale explicit?
+    - Performance guidance: presence and adequacy of complexity (Big-O), indexing recommendations with rationale, cardinality assumptions
+    - Hot paths and mitigations for critical flows

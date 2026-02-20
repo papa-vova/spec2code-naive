@@ -256,13 +256,15 @@ flowchart LR
   reExec --> persist[Persist With base_run_id]
 ```
 
-### Milestone 5: Performance And Data Model Quality Gates (3NF + Indexing)
+### Milestone 5: Performance And Data Model Quality Gates (3NF + Indexing) -- COMPLETED
 
-Add explicit audits for 3NF compliance and performance guidance. Ensure `ImplementationDesign` includes complexity analysis.
+Implemented:
 
-Exit criteria:
-
-- Designs include explicit 3NF data structures and performance guidance; reviewers enforce them.
+- `DataStructureEntry` and `PerformanceGuidanceEntry` models; `ImplementationDesignContent` extended with `data_structures` and `performance_guidance`.
+- Deterministic checks: `check_3nf_data_structures`, `check_performance_guidance` in `agentic/audits/checks.py`.
+- Config flags `require_3nf_data_structures` and `require_performance_guidance` in `config/agentic.yaml` (opt-in, default false).
+- `plan_maker` and `plan_critique_generator` prompts updated to require data_structures, performance_guidance, and `data_model_quality` rubric.
+- Tests: `test_performance_audits.py` covering 3NF and performance guidance checks.
 
 ## Acceptance Criteria (Refactor Done)
 

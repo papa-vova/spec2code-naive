@@ -25,6 +25,7 @@ spec2code-naive/
   test_audits.py                   # Audit gate and stop-logic tests
   test_rate_limit.py               # Rate limit retry tests
   test_derived_run.py              # Amendment and derived run tests
+  test_performance_audits.py      # 3NF and performance guidance audit tests
   test_runtime.py                  # Pipeline regression tests
   test_config.py                   # Config validation tool
   requirements.txt                 # Python dependencies
@@ -129,6 +130,9 @@ export OPENAI_API_KEY="your-key"
 # Amendment and derived run tests
 .venv/bin/python -m unittest test_derived_run.py
 
+# Performance and data model audit tests
+.venv/bin/python -m unittest test_performance_audits.py
+
 # Pipeline regression tests
 .venv/bin/python test_runtime.py
 
@@ -141,6 +145,7 @@ export OPENAI_API_KEY="your-key"
   && .venv/bin/python -m unittest test_audits.py \
   && .venv/bin/python -m unittest test_rate_limit.py \
   && .venv/bin/python -m unittest test_derived_run.py \
+  && .venv/bin/python -m unittest test_performance_audits.py \
   && .venv/bin/python test_runtime.py \
   && .venv/bin/python test_config.py validate
 ```
@@ -209,6 +214,19 @@ Amendment JSON format:
 ```
 
 All new artifacts from a derived run have `provenance.base_run_id` set. The base run must have `pipeline_input` stored in metadata (runs created with this version).
+
+### Performance And Data Model Audits
+
+When `ImplementationDesign` is produced, optional audits enforce 3NF and performance guidance:
+
+```yaml
+audit:
+  require_3nf_data_structures: false
+  require_performance_guidance: false
+```
+
+- `require_3nf_data_structures`: when true, `ImplementationDesign` must include at least one `data_structures` entry; non-3NF entries require `denormalization_rationale`.
+- `require_performance_guidance`: when true, `ImplementationDesign` must include `performance_guidance` entries or module-level `complexity` (Big-O).
 
 ## Run System And Artifact Store
 
@@ -281,7 +299,7 @@ Envelope validation is a hard gate; content validation is warning-level during e
 
 ### Collaboration Artifacts
 
-Milestone 2 introduces run-scoped collaboration artifacts:
+Run-scoped collaboration artifacts:
 
 - `collaboration_events.jsonl`: append-only event stream (`orchestrator_decision_made`, `artifact_produced`, and future stakeholder events).
 - `stakeholder_transcript.txt`: plain-file transcript storage for Product Owner and stakeholder interaction content.
@@ -289,7 +307,7 @@ Milestone 2 introduces run-scoped collaboration artifacts:
 
 ### Audit Gates And Stop Logic
 
-Milestone 3 adds audit-driven orchestration controls:
+Audit-driven orchestration controls:
 
 - `InfoSufficiencyAssessment` is generated at intake with `confidence_score` and `blocking_gaps`.
 - Confidence threshold is configurable in `config/agentic.yaml` via `audit.min_confidence_to_proceed`.
@@ -297,12 +315,49 @@ Milestone 3 adds audit-driven orchestration controls:
 - `TraceabilityMatrix` is generated as a canonical artifact.
 - `audits/audit_results.json` stores deterministic and semantic gate outcomes.
 
-### Derived Runs (Milestone 4)
+### Derived Runs
 
 - `--base-run` and `--amendment-file` trigger a derived run.
 - Pipeline input is replayed from base run metadata; amendments are merged into `amended_context`.
 - All artifacts carry `provenance.base_run_id` for traceability.
 
-## Architecture And Refactoring Plan
+## Architecture
 
-See [agentic_refactoring_plan.md](agentic_refactoring_plan.md) for the full agentic architecture blueprint and milestone roadmap.
+### Overview
+
+Role-based workflow: product -> requirements -> architecture -> implementation -> review. The Product Owner is the only human-facing role; other roles run automatically on artifacts.
+
+### Core Roles And Artifacts
+
+| Role | Output artifacts |
+|------|------------------|
+| Product Owner | `ProblemBrief` |
+| Business Analyst | `BusinessRequirements`, `NonFunctionalRequirements` |
+| Solution Architect | `C4Model`, `ArchitectureDecisionRecordSet`, `TechStackRecommendation` |
+| System Analyst | `ImplementableSpec` |
+| Developer | `ImplementationDesign`, `WorkBreakdown` |
+| Senior Developer | `DesignReview`, `CodeReview` |
+| Security/Privacy Reviewer | `ThreatModel`, `PrivacyChecklist` |
+| QA / Test Engineer | `TestPlan`, `AcceptanceTests` |
+
+### Assumptions, Trade-Offs, Amendments
+
+- `AssumptionLedger`: stable IDs (`ASM-*`), links to impacted requirements.
+- `TradeoffRegister`: stable IDs (`TO-*`), options, rationale.
+- `Amendment`: references `base_run_id`; triggers derived run that recomputes dependent artifacts.
+
+### Data Modeling And Performance
+
+- **3NF**: Persistent data models must be at least 3NF. Deliberate denormalization requires explicit rationale.
+- **ImplementationDesign** must include `data_structures` (with `normalization_level`) and `performance_guidance` (complexity, indexing, cardinality, hot paths) when the corresponding audit flags are enabled.
+
+### Log Separation
+
+- **Operational logs**: stderr, JSON, content-free (IDs, hashes, counts only).
+- **Collaboration artifacts**: full content in `runs/<run_id>/collaboration/` (events, transcript).
+
+### Conventions
+
+- Stable IDs: `REQ-0001`, `ADR-0001`, `ASM-0001`, etc.
+- Architecture: C4-PlantUML.
+- Timestamps: RFC 3339 (UTC).

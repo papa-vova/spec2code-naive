@@ -7,11 +7,11 @@ human_message_template: |
   Decomposed Steps:
   {decomposed_steps}
   
-  Create an implementation plan that includes:
-  1. Ordered sequence of implementation tasks
-  2. Dependencies between tasks  
-  3. Estimated complexity for each task
-  4. Required resources/technologies
+  Create an implementation plan (JSON) that includes:
+  1. modules: ordered sequence of implementation tasks with dependencies, each module may include complexity (Big-O)
+  2. algorithms: key algorithms and approaches
+  3. data_structures: list of entities with attributes, normalization_level (3NF by default), denormalization_rationale if not 3NF, assumption_refs (ASM-* links)
+  4. performance_guidance: per module/flow, complexity (Big-O), indexing_recommendations with rationale, cardinality_assumptions, hot_paths, mitigations
   
   Use the available tools to gather any additional context needed.
 
@@ -27,10 +27,10 @@ prompt_templates:
     Decomposed Steps:
     {decomposed_steps}
     
-    I'll create an implementation plan considering the existing project structure and constraints.
+    Create an implementation plan (JSON with modules, algorithms, data_structures, performance_guidance) considering the existing project structure and constraints.
     
   minimal: |
     Decomposed Steps:
     {decomposed_steps}
     
-    Implementation Plan:
+    Implementation Plan (JSON with modules, algorithms, data_structures, performance_guidance):

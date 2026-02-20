@@ -90,6 +90,8 @@ class AuditTestBase(unittest.TestCase):
                         "min_input_size_for_sufficiency": min_input_size,
                         "insufficient_markers": ["TBD", "TODO"],
                         "sufficiency_rubric": None,
+                        "require_3nf_data_structures": False,
+                        "require_performance_guidance": False,
                     },
                 }
             ),
@@ -119,6 +121,14 @@ class TestDeterministicChecks(unittest.TestCase):
         results = run_deterministic_audit(artifacts)
         self.assertFalse(results["passed"])
         self.assertTrue(results["errors"])
+
+    def test_3nf_performance_checks_skipped_when_implementation_design_absent(self):
+        artifacts = {"BusinessRequirements": {"title": "Feature"}}
+        config = type("C", (), {"require_3nf_data_structures": True, "require_performance_guidance": True})()
+        results = run_deterministic_audit(artifacts, audit_config=config)
+        self.assertNotIn("ImplementationDesign", artifacts)
+        self.assertEqual(results["results"]["three_nf"], [])
+        self.assertEqual(results["results"]["performance_guidance"], [])
 
 
 class TestSufficiencyEvaluation(unittest.TestCase):
