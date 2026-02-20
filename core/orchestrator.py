@@ -2,15 +2,43 @@
 Configuration-driven orchestrator for executing agent pipelines.
 Replaces hardcoded pipeline logic with configurable agent sequences.
 """
-import json
 import time
-from typing import Dict, Any, Optional
+import uuid
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional, List
 
-from config_system.config_loader import ConfigLoader, PipelineConfig
+from agentic.artifacts.models import (
+    Artifact,
+    ArtifactIdentity,
+    ArtifactProvenance,
+    ArtifactType,
+    ModelConfigRef,
+    PromptRef,
+    QualityMetadata,
+    compute_content_hash,
+)
+from agentic.artifacts.store import ArtifactStore
+from config_system.config_loader import ConfigLoader, PipelineConfig, ConfigValidationError
 from config_system.agent_factory import AgentFactory
 from core.agent import Agent
 from exceptions import PipelineError
-from logging_config import log_step_start, log_step_complete, log_error, log_debug
+from logging_config import log_step_start, log_step_complete, log_error
+
+
+AGENT_ARTIFACT_MAP: Dict[str, ArtifactType] = {
+    "product_owner": ArtifactType.PROBLEM_BRIEF,
+    "business_analyst": ArtifactType.BUSINESS_REQUIREMENTS,
+    "ba_lead": ArtifactType.NON_FUNCTIONAL_REQUIREMENTS,
+    "solution_architect": ArtifactType.C4_MODEL,
+    "system_analyst": ArtifactType.IMPLEMENTABLE_SPEC,
+    "developer": ArtifactType.IMPLEMENTATION_DESIGN,
+    "senior_developer": ArtifactType.DESIGN_REVIEW,
+    "security_reviewer": ArtifactType.THREAT_MODEL,
+    "qa_engineer": ArtifactType.TEST_PLAN,
+    "plan_maker": ArtifactType.IMPLEMENTATION_DESIGN,
+    "plan_critique_generator": ArtifactType.DESIGN_REVIEW,
+    "plan_critique_comparator": ArtifactType.CODE_REVIEW,
+}
 
 
 class Orchestrator:
@@ -50,7 +78,12 @@ class Orchestrator:
             except Exception as e:
                 raise PipelineError(f"Invalid agent reference '{agent_config.name}' in pipeline: {e}")
     
-    def execute_pipeline(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def execute_pipeline(
+        self,
+        input_data: Dict[str, Any],
+        run_id: Optional[str] = None,
+        artifact_store: Optional[ArtifactStore] = None,
+    ) -> Dict[str, Any]:
         """
         Execute the configured pipeline with given input data.
         
@@ -82,6 +115,7 @@ class Orchestrator:
                 "agent_sequence": [agent.name for agent in self.pipeline_config.agents]
             }
         }
+        artifacts_manifest: List[Dict[str, Any]] = []
         
         try:
             # Execute agents in sequence
@@ -102,7 +136,8 @@ class Orchestrator:
                     )
                 
                 # Create agent instance
-                agent = self._create_agent(agent_config.name)
+                role_model_name = self._resolve_role_model(agent_config.name)
+                agent = self._create_agent(agent_config.name, role_model_name)
                 
                 # Prepare input data for this agent
                 agent_input = self._prepare_agent_input(pipeline_data, agent_config)
@@ -124,9 +159,29 @@ class Orchestrator:
                     "metadata": {
                         "execution_time": (time.time() - agent_start_time) * 1000,
                         "prompt_templates_used": agent_output.get("prompt_templates_used", []),
-                        "input_sources": input_sources
+                        "input_sources": input_sources,
+                        "role_model_profile_id": agent_config.name,
+                        "role_model_name": role_model_name,
                     }
                 }
+
+                if artifact_store and run_id:
+                    artifact = self._build_artifact(
+                        run_id=run_id,
+                        agent_name=agent_config.name,
+                        role_model_name=role_model_name,
+                        agent_output=agent_output["output"],
+                        prompt_templates_used=agent_output.get("prompt_templates_used", []),
+                    )
+                    artifact_path = artifact_store.write_artifact(run_id, artifact)
+                    if artifact_path:
+                        artifacts_manifest.append(
+                            {
+                                "artifact_type": artifact.identity.artifact_type.value,
+                                "file": str(artifact_path.relative_to(artifact_store.get_run_directory(run_id))),
+                                "content_hash": artifact.content_hash,
+                            }
+                        )
                 
                 if self.logger:
                     log_step_complete(
@@ -150,7 +205,8 @@ class Orchestrator:
                 "execution_successful": True,
                 "pipeline_input": pipeline_data["pipeline_input"],
                 "agents": pipeline_data["agents"],
-                "metadata": pipeline_data["metadata"]
+                "metadata": pipeline_data["metadata"],
+                "artifacts_manifest": artifacts_manifest,
             }
             
             if self.logger:
@@ -171,12 +227,20 @@ class Orchestrator:
                 log_error(self.logger, f"Pipeline execution failed: {str(e)}", "Orchestrator", e)
             raise PipelineError(f"Pipeline execution failed: {str(e)}")
     
-    def _create_agent(self, agent_name: str) -> Agent:
+    def _create_agent(self, agent_name: str, role_model_name: str) -> Agent:
         """Create an agent instance for the given agent name."""
-        agent = self.agent_factory.create_agent(agent_name, self.dry_run)
+        agent = self.agent_factory.create_agent_with_model(agent_name, role_model_name, self.dry_run)
         if self.logger:
             agent.set_logger(self.logger)
         return agent
+
+    def _resolve_role_model(self, role_name: str) -> str:
+        """Resolve role model profile; fallback to agent config model."""
+        try:
+            return self.config_loader.get_role_model(role_name)
+        except ConfigValidationError:
+            # Backstop for legacy or ad-hoc agent names.
+            return self.config_loader.load_agent_config(role_name).llm
     
     def _prepare_agent_input(self, pipeline_data: Dict[str, Any], agent_config) -> Dict[str, Any]:
         """Prepare input data for an agent based on its input sources."""
@@ -264,3 +328,53 @@ class Orchestrator:
                 "prompt_templates_count": len(all_templates)
             }
         }
+
+    def _build_artifact(
+        self,
+        run_id: str,
+        agent_name: str,
+        role_model_name: str,
+        agent_output: Dict[str, Any],
+        prompt_templates_used: List[str],
+    ) -> Artifact:
+        """Build canonical artifact for an agent output."""
+        artifact_type = AGENT_ARTIFACT_MAP.get(agent_name, ArtifactType.BUSINESS_REQUIREMENTS)
+        model_config = self.config_loader.load_model_config(role_model_name)
+        prompt_template_name = prompt_templates_used[0] if prompt_templates_used else "default"
+        prompt_template_version = "|".join(prompt_templates_used) if prompt_templates_used else "default"
+
+        quality = QualityMetadata()
+        assumptions = agent_output.get("assumptions")
+        if isinstance(assumptions, list):
+            quality.assumptions = [str(item) for item in assumptions]
+
+        identity = ArtifactIdentity(
+            artifact_id=artifact_type.value,
+            artifact_type=artifact_type,
+            schema_version="1.0.0",
+        )
+        provenance = ArtifactProvenance(
+            run_id=run_id,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            created_by_role=agent_name,
+            created_by_agent_instance_id=str(uuid.uuid4()),
+            model_config_ref=ModelConfigRef(
+                provider=model_config.provider,
+                model_name=model_config.model_name,
+                parameters=model_config.parameters,
+            ),
+            role_model_profile_id=agent_name,
+            prompt_ref=PromptRef(
+                template_name=prompt_template_name,
+                template_version=prompt_template_version,
+            ),
+        )
+        content_hash = compute_content_hash(agent_output)
+
+        return Artifact(
+            identity=identity,
+            provenance=provenance,
+            content=agent_output,
+            quality_metadata=quality,
+            content_hash=content_hash,
+        )

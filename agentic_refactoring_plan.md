@@ -5,7 +5,7 @@
 This repository is already a multi-agent pipeline:
 
 - Agents run **sequentially** as defined in YAML (`config/pipeline.yaml`).
-- Agents and prompts are configured in `config/agents/**`.
+- Agents and prompts are configured in `config/agents/`**.
 - A run produces artifacts in `runs/<run_id>/` (for example `result.json`, `metadata.json`).
 - Operational logs go to **stderr**; pipeline output goes to **stdout**.
 
@@ -50,40 +50,33 @@ Your role set is a good start. The main improvement is to make outputs and bound
   - **Purpose**: elicit missing context from a moderately tech-savvy stakeholder.
   - **Interaction**: must support interactive Q&A with the human.
   - **Output artifact**: `ProblemBrief` (improved initial formulation + success criteria + constraints + assumptions + glossary).
-
 - **Business Analyst (BA)**
   - **Purpose**: translate business goals into measurable requirements and constraints.
   - **Interaction**: collaborates with PO; may request additional clarifications via PO when necessary.
   - **Output artifacts**: `BusinessRequirements` and `NonFunctionalRequirements`.
-
 - **Solution Architect (SA)**
   - **Purpose**: propose architecture options and select a recommended approach.
   - **Output artifacts**:
     - `ArchitectureDecisionRecordSet` (ADRs with trade-offs)
     - `C4Model` (C4-PlantUML source and identifiers)
     - `TechStackRecommendation`
-
 - **System Analyst (SysA) / Requirements Engineer**
   - **Purpose**: convert BA+SA outputs into implementation-ready requirements.
   - **Key improvement**: this role should produce a **single canonical “implementable spec”** with stable identifiers.
   - **Output artifact**: `ImplementableSpec` (functional requirements, NFRs, data contracts, acceptance criteria, edge cases).
-
 - **Developer**
   - **Purpose**: produce a formalized implementation design and plan that is grounded in the `ImplementableSpec`.
   - **Output artifacts**:
     - `ImplementationDesign` (modules, algorithms, key data structures, API design, migrations)
     - `WorkBreakdown` (tasks linked to requirement IDs; test approach; rollout plan)
-
 - **Senior Developer (Reviewer)**
   - **Purpose**: design review and code review (and “review of review” if using multiple dev instances).
   - **Output artifacts**:
     - `DesignReview` (findings, required changes, optional improvements)
     - `CodeReview` (if/when code exists)
-
 - **Security/Privacy Reviewer**
   - **Purpose**: threat model, data classification, privacy constraints for collaboration artifacts and runtime behaviors.
   - **Output artifact**: `ThreatModel` and `PrivacyChecklist`.
-
 - **QA / Test Engineer**
   - **Purpose**: independent test strategy and acceptance test cases.
   - **Output artifact**: `TestPlan` and `AcceptanceTests`.
@@ -116,7 +109,7 @@ Each transition is guarded by an **audit gate** (see “Auditing And Consistency
 The orchestrator must run an explicit **information sufficiency evaluation** after `Clarify` (and optionally after later steps). This produces an `InfoSufficiencyAssessment` artifact with:
 
 - **Coverage**: which required areas are sufficiently specified (per a rubric).
-- **Confidence score**: a numeric score in \([0, 1]\), plus per-area sub-scores.
+- **Confidence score**: a numeric score in [0, 1], plus per-area sub-scores.
 - **Blocking gaps**: missing inputs that prevent safe progression.
 
 Policy:
@@ -162,7 +155,7 @@ This is required for auditability and replay.
 Assumptions and trade-offs must be first-class, versioned artifacts:
 
 - `AssumptionLedger`
-  - Stable assumption IDs (`ASM-*`)
+  - Stable assumption IDs (`ASM-`*)
   - Status: proposed / accepted / rejected / amended
   - Impacted requirement IDs (`REQ-*`) and decisions (`ADR-*`)
 - `TradeoffRegister`
@@ -282,7 +275,7 @@ Orchestrator policy:
 
 Add a generated `TraceabilityMatrix` artifact:
 
-- Rows: implementable requirements (`REQ-*`)
+- Rows: implementable requirements (`REQ-`*)
 - Columns: business objectives (`OBJ-*`), architecture decisions (`ADR-*`), design elements (`DES-*`), tasks (`TASK-*`), tests (`TEST-*`)
 - Cells: references; empty cells highlight gaps.
 
@@ -373,7 +366,7 @@ This is a proposed end state; an incremental migration plan is below.
 
 Note: The exact top-level package name can match your preference; the goal is clean separation, not the specific naming.
 
-### Mapping From Current Modules (Suggested)
+### **Mapping From Current Modules (Suggested)**
 
 This keeps migration concrete and avoids a “big bang” rewrite:
 
@@ -396,6 +389,50 @@ The target is a clean cutover to agentic orchestration. The migration can still 
 Exit criteria:
 
 - A run produces the canonical artifacts and passes schema validation.
+
+#### Milestone 1 Implementation Notes
+
+- Canonical artifact envelope includes `content_hash` and provenance `created_at`.
+- Timestamp serialization uses RFC3339/ISO8601 with timezone offset (UTC by default).
+- Role model profiles are configured in `config/agentic.yaml` and resolved per role.
+- M1 semantic content validation is warning-level; envelope validation is hard-gate.
+
+#### Orchestrator To Artifact Flow
+
+```mermaid
+flowchart LR
+  inputFile[InputFile] --> mainPy[mainPy]
+  mainPy --> orchestrator[orchestrator]
+  orchestrator --> roleAgent[roleAgent]
+  roleAgent --> artifactWrap[artifactWrap]
+  artifactWrap --> artifactStore[artifactStore]
+  artifactStore --> artifactFile[artifactFile]
+  orchestrator --> resultData[resultData]
+  resultData --> metadataWrite[metadataWrite]
+```
+
+#### Artifact Lifecycle
+
+```mermaid
+flowchart LR
+  createContent[createContent] --> buildEnvelope[buildEnvelope]
+  buildEnvelope --> computeHash[computeHash]
+  computeHash --> envelopeValidate[envelopeValidate]
+  envelopeValidate --> contentValidate[contentValidate]
+  contentValidate --> persistArtifact[persistArtifact]
+  persistArtifact --> updateManifest[updateManifest]
+```
+
+#### Configuration Resolution Flow
+
+```mermaid
+flowchart LR
+  agentRole[agentRole] --> roleProfile[roleProfile]
+  roleProfile --> modelConfig[modelConfig]
+  modelConfig --> agentFactory[agentFactory]
+  agentFactory --> llmInstance[llmInstance]
+  llmInstance --> agentRun[agentRun]
+```
 
 ### Milestone 2: Collaboration Artifacts And Stakeholder Transcript
 
@@ -486,7 +523,7 @@ Architecture representation is restricted to **C4 diagrams expressed as PlantUML
 - `C4Model` should include:
   - `plantuml_source` (or referenced `.puml` files as run artifacts)
   - diagram list: context, container, component (as needed)
-  - stable element identifiers used for traceability (`C4-*`)
+  - stable element identifiers used for traceability (`C4-`*)
 
 ## Open Decisions (Updated)
 

@@ -1,0 +1,34 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "modules": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Modules",
+      "type": "array"
+    },
+    "algorithms": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Algorithms",
+      "type": "array"
+    }
+  },
+  "title": "ImplementationDesignContent",
+  "type": "object"
+}

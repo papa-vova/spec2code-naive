@@ -1,0 +1,38 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    },
+    "goals": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Goals",
+      "type": "array"
+    }
+  },
+  "title": "ProblemBriefContent",
+  "type": "object"
+}

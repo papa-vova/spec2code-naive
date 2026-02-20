@@ -96,6 +96,23 @@ class AgentFactory:
             llm=llm,
             dry_run=dry_run
         )
+
+    def create_agent_with_model(self, agent_name: str, model_name: str, dry_run: bool = False) -> Agent:
+        """Create agent but override model with a role profile model."""
+        agent_config = self.config_loader.load_agent_config(agent_name)
+        prompts_config = self.config_loader.load_prompts_config(agent_name)
+
+        llm = None
+        if not dry_run:
+            model_config = self.config_loader.load_model_config(model_name)
+            llm = self.model_registry.create_llm(model_config)
+
+        return Agent(
+            config=agent_config,
+            prompts=prompts_config,
+            llm=llm,
+            dry_run=dry_run,
+        )
     
     def create_agents(self, required_agents: list, dry_run: bool = False) -> Dict[str, Any]:
         """Create multiple agents from a list of required agent names."""

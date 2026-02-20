@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "ArtifactIdentity": {
+      "description": "Artifact identity envelope.",
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "artifact_type": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "schema_version": {
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "artifact_type",
+        "schema_version"
+      ],
+      "title": "ArtifactIdentity",
+      "type": "object"
+    },
+    "ArtifactInputRef": {
+      "description": "Input reference for artifact provenance.",
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "content_hash"
+      ],
+      "title": "ArtifactInputRef",
+      "type": "object"
+    },
+    "ArtifactProvenance": {
+      "description": "Artifact provenance envelope.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "base_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Base Run Id"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by_role": {
+          "title": "Created By Role",
+          "type": "string"
+        },
+        "created_by_agent_instance_id": {
+          "title": "Created By Agent Instance Id",
+          "type": "string"
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/ArtifactInputRef"
+          },
+          "title": "Inputs",
+          "type": "array"
+        },
+        "model_config_ref": {
+          "$ref": "#/$defs/ModelConfigRef"
+        },
+        "role_model_profile_id": {
+          "title": "Role Model Profile Id",
+          "type": "string"
+        },
+        "prompt_ref": {
+          "$ref": "#/$defs/PromptRef"
+        }
+      },
+      "required": [
+        "run_id",
+        "created_at",
+        "created_by_role",
+        "created_by_agent_instance_id",
+        "model_config_ref",
+        "role_model_profile_id",
+        "prompt_ref"
+      ],
+      "title": "ArtifactProvenance",
+      "type": "object"
+    },
+    "ArtifactType": {
+      "description": "Supported artifact types.",
+      "enum": [
+        "ProblemBrief",
+        "BusinessRequirements",
+        "NonFunctionalRequirements",
+        "C4Model",
+        "ArchitectureDecisionRecordSet",
+        "TechStackRecommendation",
+        "AssumptionLedger",
+        "TradeoffRegister",
+        "InfoSufficiencyAssessment",
+        "ImplementableSpec",
+        "ImplementationDesign",
+        "WorkBreakdown",
+        "DesignReview",
+        "CodeReview",
+        "ThreatModel",
+        "PrivacyChecklist",
+        "TestPlan",
+        "AcceptanceTests"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "ModelConfigRef": {
+      "description": "Model configuration reference captured in provenance.",
+      "properties": {
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "model_name": {
+          "title": "Model Name",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "provider",
+        "model_name"
+      ],
+      "title": "ModelConfigRef",
+      "type": "object"
+    },
+    "PromptRef": {
+      "description": "Prompt template reference captured in provenance.",
+      "properties": {
+        "template_name": {
+          "title": "Template Name",
+          "type": "string"
+        },
+        "template_version": {
+          "title": "Template Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "template_name",
+        "template_version"
+      ],
+      "title": "PromptRef",
+      "type": "object"
+    },
+    "QualityMetadata": {
+      "description": "Shared quality metadata envelope.",
+      "properties": {
+        "assumptions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "open_questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Questions",
+          "type": "array"
+        },
+        "risks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risks",
+          "type": "array"
+        },
+        "acceptance_criteria": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Acceptance Criteria",
+          "type": "array"
+        }
+      },
+      "title": "QualityMetadata",
+      "type": "object"
+    }
+  },
+  "description": "Canonical artifact envelope.",
+  "properties": {
+    "identity": {
+      "$ref": "#/$defs/ArtifactIdentity"
+    },
+    "provenance": {
+      "$ref": "#/$defs/ArtifactProvenance"
+    },
+    "content": {
+      "additionalProperties": true,
+      "title": "Content",
+      "type": "object"
+    },
+    "quality_metadata": {
+      "$ref": "#/$defs/QualityMetadata"
+    },
+    "content_hash": {
+      "title": "Content Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "identity",
+    "provenance",
+    "content",
+    "content_hash"
+  ],
+  "title": "Artifact",
+  "type": "object"
+}

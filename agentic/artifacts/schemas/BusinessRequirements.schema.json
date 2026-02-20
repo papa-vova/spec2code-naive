@@ -1,0 +1,51 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    },
+    "functional_requirements": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Functional Requirements",
+      "type": "array"
+    },
+    "non_functional_requirements": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Non Functional Requirements",
+      "type": "array"
+    },
+    "resources": {
+      "additionalProperties": true,
+      "title": "Resources",
+      "type": "object"
+    }
+  },
+  "title": "BusinessRequirementsContent",
+  "type": "object"
+}

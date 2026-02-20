@@ -5,13 +5,14 @@ Implements steps 4-6 of the analysis branch.
 import os
 import sys
 import argparse
-import time
-from typing import List, Dict, Any
+from typing import Dict, Any
+from agentic.artifacts.models import ArtifactType
+from agentic.artifacts.store import ArtifactStore
+from agentic.artifacts.validation import validate_content, validate_envelope
 from core.orchestrator import Orchestrator
-from core.run_manager import RunManager
 from config_system.config_loader import ConfigLoader
 from exceptions import PipelineError, InputError, FileNotFoundError, EmptyFileError
-from logging_config import setup_pipeline_logging, log_step_start, log_step_complete, log_debug, log_error
+from logging_config import setup_pipeline_logging, log_debug, log_error
 
 
 class Pipeline:
@@ -29,7 +30,7 @@ class Pipeline:
             
             # Initialize run manager based on pipeline settings
             pipeline_config = self.orchestrator.pipeline_config
-            self.run_manager = RunManager(
+            self.artifact_store = ArtifactStore(
                 runs_directory=pipeline_config.settings.runs_directory,
                 create_artifacts=pipeline_config.settings.create_run_artifacts
             )
@@ -42,8 +43,6 @@ class Pipeline:
         # Also set logger on orchestrator and run manager
         if hasattr(self, 'orchestrator'):
             self.orchestrator.set_logger(logger)
-        if hasattr(self, 'run_manager'):
-            self.run_manager.set_logger(logger)
     
     def run_pipeline(self, input_description: str, input_file: str = None) -> Dict[str, Any]:
         """
@@ -57,7 +56,7 @@ class Pipeline:
             Dictionary containing the orchestrator result with run_id
         """
         # Generate unique run ID
-        run_id = self.run_manager.generate_run_id()
+        run_id = self.artifact_store.generate_run_id()
         
         # Prepare input data for orchestrator with proper structure
         input_data = {
@@ -67,27 +66,65 @@ class Pipeline:
         }
         
         # Execute pipeline using orchestrator
-        result = self.orchestrator.execute_pipeline(input_data)
+        result = self.orchestrator.execute_pipeline(
+            input_data=input_data,
+            run_id=run_id,
+            artifact_store=self.artifact_store,
+        )
         
         # Add run ID to result
         result["run_id"] = run_id
         
         # Save run artifacts if enabled
-        if self.run_manager.create_artifacts:
-            self.run_manager.save_run_result(
+        if self.artifact_store.create_artifacts:
+            self.artifact_store.write_metadata(
                 run_id=run_id,
-                result=result,
                 config_root=self.config_root,
                 input_file=input_file
+                ,
+                pipeline_name=result.get("pipeline_name", "unknown"),
+                execution_successful=result.get("execution_successful", False),
+                total_execution_time=result.get("metadata", {}).get("execution_time", 0),
+                artifacts_manifest=result.get("artifacts_manifest", []),
             )
             
             if self.logger:
                 log_debug(self.logger, f"Run artifacts saved for run ID: {run_id}", "Pipeline", {
                     "run_id": run_id,
-                    "runs_directory": self.run_manager.runs_directory
+                    "runs_directory": self.artifact_store.runs_directory
                 })
+
+            # Deterministic validation pass for all persisted artifacts.
+            self._validate_artifacts(run_id, result.get("artifacts_manifest", []))
         
         return result
+
+    def _validate_artifacts(self, run_id: str, artifacts_manifest: list[dict[str, Any]]) -> None:
+        """Validate artifact envelope and content constraints."""
+        for manifest in artifacts_manifest:
+            artifact_type_name = manifest.get("artifact_type")
+            if not artifact_type_name:
+                continue
+            artifact = self.artifact_store.read_artifact(run_id, artifact_type_name)
+            artifact_payload = artifact.model_dump(mode="json")
+            envelope_errors = validate_envelope(artifact_payload)
+            if envelope_errors:
+                raise PipelineError(
+                    f"Artifact envelope validation failed for {artifact_type_name}: {envelope_errors}"
+                )
+
+            content_errors = validate_content(ArtifactType(artifact_type_name), artifact.content)
+            if content_errors and self.logger:
+                self.logger.warning(
+                    "Artifact content validation warnings",
+                    extra={
+                        "component": "Pipeline",
+                        "data": {
+                            "artifact_type": artifact_type_name,
+                            "warning_count": len(content_errors),
+                        },
+                    },
+                )
 
 
 def main():

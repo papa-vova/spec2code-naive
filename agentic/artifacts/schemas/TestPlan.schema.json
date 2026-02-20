@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "test_suites": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Test Suites",
+      "type": "array"
+    }
+  },
+  "title": "TestPlanContent",
+  "type": "object"
+}

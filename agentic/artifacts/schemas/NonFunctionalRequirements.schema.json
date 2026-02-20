@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "categories": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Categories",
+      "type": "array"
+    }
+  },
+  "title": "NonFunctionalRequirementsContent",
+  "type": "object"
+}

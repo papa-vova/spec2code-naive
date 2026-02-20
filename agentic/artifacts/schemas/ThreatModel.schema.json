@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "threats": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Threats",
+      "type": "array"
+    }
+  },
+  "title": "ThreatModelContent",
+  "type": "object"
+}

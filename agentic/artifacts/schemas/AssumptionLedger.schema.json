@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "assumptions": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    }
+  },
+  "title": "AssumptionLedgerContent",
+  "type": "object"
+}

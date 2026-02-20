@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "decisions": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Decisions",
+      "type": "array"
+    }
+  },
+  "title": "ArchitectureDecisionRecordSetContent",
+  "type": "object"
+}

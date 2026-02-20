@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "tests": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Tests",
+      "type": "array"
+    }
+  },
+  "title": "AcceptanceTestsContent",
+  "type": "object"
+}

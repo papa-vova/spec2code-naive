@@ -7,8 +7,8 @@ import os
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 from pydantic import BaseModel, ValidationError
-from langchain.schema import BaseMessage, SystemMessage, HumanMessage, AIMessage
-from langchain.prompts import PromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from langchain_core.messages import AIMessage
+from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 
 
 class ModelConfig(BaseModel):
@@ -84,6 +84,18 @@ class PipelineConfig(BaseModel):
     settings: PipelineSettingsConfig
 
 
+class RoleModelProfile(BaseModel):
+    """Role-level model profile."""
+
+    model: str
+
+
+class AgenticConfig(BaseModel):
+    """Configuration for agentic role model profiles."""
+
+    role_model_profiles: Dict[str, RoleModelProfile]
+
+
 class ConfigValidationError(Exception):
     """Raised when configuration validation fails."""
     pass
@@ -97,6 +109,7 @@ class ConfigLoader:
         self._models_cache: Dict[str, ModelConfig] = {}
         self._agents_cache: Dict[str, AgentConfig] = {}
         self._prompts_cache: Dict[str, PromptsConfig] = {}
+        self._agentic_config: Optional[AgenticConfig] = None
         
     def validate_config_structure(self) -> bool:
         """Validate that required config directories and files exist."""
@@ -216,6 +229,43 @@ class ConfigLoader:
             raise ConfigValidationError(f"Invalid YAML in {pipeline_path}: {e}")
         except ValidationError as e:
             raise ConfigValidationError(f"Invalid pipeline config in {pipeline_path}: {e}")
+
+    def load_agentic_config(self) -> AgenticConfig:
+        """Load and validate agentic configuration."""
+        if self._agentic_config is not None:
+            return self._agentic_config
+
+        agentic_path = self.config_root / "agentic.yaml"
+        if not agentic_path.exists():
+            raise ConfigValidationError(f"Agentic config not found: {agentic_path}")
+
+        try:
+            with open(agentic_path, "r", encoding="utf-8") as file_obj:
+                config_data = yaml.safe_load(file_obj) or {}
+            agentic_config = AgenticConfig(**config_data)
+
+            # Ensure referenced model profiles are resolvable.
+            for role_name, profile in agentic_config.role_model_profiles.items():
+                try:
+                    self.load_model_config(profile.model)
+                except ConfigValidationError as exc:
+                    raise ConfigValidationError(
+                        f"Role profile '{role_name}' references invalid model '{profile.model}': {exc}"
+                    ) from exc
+
+            self._agentic_config = agentic_config
+            return agentic_config
+        except yaml.YAMLError as e:
+            raise ConfigValidationError(f"Invalid YAML in {agentic_path}: {e}")
+        except ValidationError as e:
+            raise ConfigValidationError(f"Invalid agentic config in {agentic_path}: {e}")
+
+    def get_role_model(self, role_name: str) -> str:
+        """Resolve model name configured for a role."""
+        agentic = self.load_agentic_config()
+        if role_name not in agentic.role_model_profiles:
+            raise ConfigValidationError(f"Role model profile not found for role: {role_name}")
+        return agentic.role_model_profiles[role_name].model
 
     def create_chat_prompt_template(self, agent_name: str, template_name: str = "default") -> ChatPromptTemplate:
         """Create LangChain ChatPromptTemplate from configuration."""
@@ -359,6 +409,11 @@ class ConfigLoader:
             
             # Validate pipeline configuration and template consistency
             self._validate_pipeline_template_consistency()
+
+            # Validate agentic role model profiles if config file exists
+            agentic_path = self.config_root / "agentic.yaml"
+            if agentic_path.exists():
+                self.load_agentic_config()
             
             return True
             

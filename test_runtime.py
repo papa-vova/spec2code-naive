@@ -266,7 +266,7 @@ class TestUnifiedDataStructure(unittest.TestCase):
                 "output": {"agent_response": "test result"},
                 "metadata": {"execution_time": 100}
             }
-            mock_factory.return_value.create_agent.return_value = mock_agent
+            mock_factory.return_value.create_agent_with_model.return_value = mock_agent
             
             orchestrator = Orchestrator(str(self.config_root), dry_run=True)
             

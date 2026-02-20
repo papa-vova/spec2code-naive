@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "raw_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Response"
+    },
+    "stack": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Stack",
+      "type": "array"
+    }
+  },
+  "title": "TechStackRecommendationContent",
+  "type": "object"
+}

@@ -5,7 +5,6 @@ Replaces individual agent classes with a single configurable implementation.
 import json
 from typing import Dict, Any, Optional, List
 from langchain_core.language_models.base import BaseLanguageModel
-from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 
