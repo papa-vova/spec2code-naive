@@ -20,7 +20,7 @@ from agentic.artifacts.models import (
 from agentic.artifacts.store import ArtifactStore
 from agentic.collaboration.event_log import CollaborationEventLog
 from agentic.collaboration.models import CollaborationEvent, CollaborationEventType
-from config_system.config_loader import ConfigLoader, PipelineConfig, ConfigValidationError
+from config_system.config_loader import ConfigLoader
 from config_system.agent_factory import AgentFactory
 from core.agent import Agent
 from exceptions import PipelineError
@@ -300,12 +300,8 @@ class Orchestrator:
         return agent
 
     def _resolve_role_model(self, role_name: str) -> str:
-        """Resolve role model profile; fallback to agent config model."""
-        try:
-            return self.config_loader.get_role_model(role_name)
-        except ConfigValidationError:
-            # Backstop for legacy or ad-hoc agent names.
-            return self.config_loader.load_agent_config(role_name).llm
+        """Resolve role model profile for the configured role."""
+        return self.config_loader.get_role_model(role_name)
     
     def _prepare_agent_input(self, pipeline_data: Dict[str, Any], agent_config) -> Dict[str, Any]:
         """Prepare input data for an agent based on its input sources."""

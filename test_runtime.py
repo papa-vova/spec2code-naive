@@ -97,6 +97,14 @@ class TestUnifiedDataStructure(unittest.TestCase):
         }
         with open(self.config_root / "pipeline.yaml", "w") as f:
             yaml.dump(pipeline_config, f)
+
+        # Agentic role model profiles are required in the current architecture.
+        role_profiles = {
+            agent["name"]: {"model": "test_model"}
+            for agent in agents_config
+        }
+        with open(self.config_root / "agentic.yaml", "w") as f:
+            yaml.dump({"role_model_profiles": role_profiles}, f)
     
     def test_pipeline_agent_config_single_input(self):
         """Test PipelineAgentConfig with single input."""

@@ -2,13 +2,14 @@
 
 Multi-agent LangChain pipeline that transforms rough feature descriptions into formalized, auditable specification artifacts. Agents are configured via YAML and produce typed, schema-validated artifacts with full provenance.
 
-## How It Works
+## Current Implementation
 
-- Agents execute sequentially as defined in `config/pipeline.yaml`.
+- The orchestrator executes configured agents sequentially from `config/pipeline.yaml`.
 - Each agent produces a **typed artifact** stored as a separate JSON file under `runs/<run_id>/artifacts/`.
 - Every artifact carries an **envelope** (identity, provenance, quality metadata, content hash) validated at write time.
 - **Per-role model profiles** in `config/agentic.yaml` control which LLM each role uses.
-- Operational logs go to `stderr` (JSON, content-free); structured output goes to `stdout`.
+- Collaboration artifacts are stored separately under `runs/<run_id>/collaboration/`.
+- Operational logs go to `stderr` (JSON, content-free).
 - Exit codes: 0 = success, 1 = failure.
 
 ## Structure
@@ -40,7 +41,6 @@ spec2code-naive/
   core/
     agent.py                       # Agent execution (LangChain)
     orchestrator.py                # Pipeline orchestration + artifact wrapping
-    run_manager.py                 # Deprecated; kept for reference
   config/
     agentic.yaml                   # Role model profiles
     pipeline.yaml                  # Agent sequence and inputs

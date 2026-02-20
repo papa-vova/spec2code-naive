@@ -2,14 +2,12 @@
 Generic Agent class that can be configured to behave as any agent type.
 Replaces individual agent classes with a single configurable implementation.
 """
-import json
 from typing import Dict, Any, Optional, List
 from langchain_core.language_models.base import BaseLanguageModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 
 from config_system.config_loader import AgentConfig, PromptsConfig
-from exceptions import PlanGenerationError, ReportGenerationError, MetricComparisonError
 from logging_config import log_step_start, log_step_complete, log_error
 
 
@@ -193,21 +191,7 @@ class Agent:
             output_parser = StrOutputParser()
             chain = self.llm | output_parser
             
-            # Execute the chain
-            if self.logger:
-                self.logger.debug(f"Executing LangChain for {self.config.name}", extra={
-                    "component": self.config.name,
-                    "data": {"message_count": len(messages)}
-                })
-            
             response = chain.invoke(messages)
-            
-            # Debug logging to understand the response format
-            if self.logger:
-                self.logger.debug(f"Raw LLM response for {self.config.name}: {repr(response)}", extra={
-                    "component": self.config.name,
-                    "data": {"response_type": type(response).__name__, "response_length": len(str(response))}
-                })
             
             # Return structured output with optional message capture
             result = {
