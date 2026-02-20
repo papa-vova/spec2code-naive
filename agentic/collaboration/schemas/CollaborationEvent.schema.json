@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "CollaborationEventType": {
+      "description": "Supported collaboration event types.",
+      "enum": [
+        "stakeholder_question_asked",
+        "stakeholder_answer_received",
+        "artifact_produced",
+        "artifact_revised",
+        "audit_gate_passed",
+        "audit_gate_failed",
+        "orchestrator_decision_made"
+      ],
+      "title": "CollaborationEventType",
+      "type": "string"
+    },
+    "ContentRef": {
+      "description": "Reference to a stored collaboration content blob.",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "content_hash"
+      ],
+      "title": "ContentRef",
+      "type": "object"
+    }
+  },
+  "description": "Append-only collaboration event entry.",
+  "properties": {
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "actor": {
+      "title": "Actor",
+      "type": "string"
+    },
+    "event_type": {
+      "$ref": "#/$defs/CollaborationEventType"
+    },
+    "references": {
+      "items": {
+        "type": "string"
+      },
+      "title": "References",
+      "type": "array"
+    },
+    "content_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ContentRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_id",
+    "timestamp",
+    "run_id",
+    "actor",
+    "event_type",
+    "summary"
+  ],
+  "title": "CollaborationEvent",
+  "type": "object"
+}

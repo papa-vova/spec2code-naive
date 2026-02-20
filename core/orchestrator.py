@@ -18,6 +18,8 @@ from agentic.artifacts.models import (
     compute_content_hash,
 )
 from agentic.artifacts.store import ArtifactStore
+from agentic.collaboration.event_log import CollaborationEventLog
+from agentic.collaboration.models import CollaborationEvent, CollaborationEventType
 from config_system.config_loader import ConfigLoader, PipelineConfig, ConfigValidationError
 from config_system.agent_factory import AgentFactory
 from core.agent import Agent
@@ -83,6 +85,7 @@ class Orchestrator:
         input_data: Dict[str, Any],
         run_id: Optional[str] = None,
         artifact_store: Optional[ArtifactStore] = None,
+        collaboration_event_log: Optional[CollaborationEventLog] = None,
     ) -> Dict[str, Any]:
         """
         Execute the configured pipeline with given input data.
@@ -116,6 +119,15 @@ class Orchestrator:
             }
         }
         artifacts_manifest: List[Dict[str, Any]] = []
+        if collaboration_event_log and run_id:
+            self._emit_collaboration_event(
+                collaboration_event_log=collaboration_event_log,
+                run_id=run_id,
+                actor="orchestrator",
+                event_type=CollaborationEventType.ORCHESTRATOR_DECISION_MADE,
+                references=[],
+                summary="Pipeline execution started",
+            )
         
         try:
             # Execute agents in sequence
@@ -182,6 +194,15 @@ class Orchestrator:
                                 "content_hash": artifact.content_hash,
                             }
                         )
+                        if collaboration_event_log:
+                            self._emit_collaboration_event(
+                                collaboration_event_log=collaboration_event_log,
+                                run_id=run_id,
+                                actor=agent_config.name,
+                                event_type=CollaborationEventType.ARTIFACT_PRODUCED,
+                                references=[artifact.identity.artifact_id, artifact.content_hash],
+                                summary=f"Artifact {artifact.identity.artifact_type.value} produced",
+                            )
                 
                 if self.logger:
                     log_step_complete(
@@ -219,6 +240,15 @@ class Orchestrator:
                         "agents_executed": len(self.pipeline_config.agents)
                     }
                 )
+            if collaboration_event_log and run_id:
+                self._emit_collaboration_event(
+                    collaboration_event_log=collaboration_event_log,
+                    run_id=run_id,
+                    actor="orchestrator",
+                    event_type=CollaborationEventType.ORCHESTRATOR_DECISION_MADE,
+                    references=[],
+                    summary="Pipeline execution completed",
+                )
             
             return final_result
             
@@ -226,6 +256,41 @@ class Orchestrator:
             if self.logger:
                 log_error(self.logger, f"Pipeline execution failed: {str(e)}", "Orchestrator", e)
             raise PipelineError(f"Pipeline execution failed: {str(e)}")
+
+    def _emit_collaboration_event(
+        self,
+        collaboration_event_log: CollaborationEventLog,
+        run_id: str,
+        actor: str,
+        event_type: CollaborationEventType,
+        references: List[str],
+        summary: str,
+    ) -> None:
+        """Emit one collaboration event and keep orchestration flow resilient."""
+        try:
+            event = CollaborationEvent(
+                event_id=str(uuid.uuid4()),
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                run_id=run_id,
+                actor=actor,
+                event_type=event_type,
+                references=references,
+                summary=summary,
+            )
+            collaboration_event_log.emit(event)
+        except Exception as exc:
+            if self.logger:
+                self.logger.warning(
+                    "Collaboration event emission failed",
+                    extra={
+                        "component": "Orchestrator",
+                        "data": {
+                            "event_type": event_type.value,
+                            "run_id": run_id,
+                            "error_type": type(exc).__name__,
+                        },
+                    },
+                )
     
     def _create_agent(self, agent_name: str, role_model_name: str) -> Agent:
         """Create an agent instance for the given agent name."""

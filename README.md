@@ -1,181 +1,218 @@
-# spec2code-naïve
+# spec2code-naive
 
-Multi-agent LangChain pipeline that processes input through sequential agent execution. Agents are configured via YAML files and can use any LangChain-compatible LLM provider.
+Multi-agent LangChain pipeline that transforms rough feature descriptions into formalized, auditable specification artifacts. Agents are configured via YAML and produce typed, schema-validated artifacts with full provenance.
 
 ## How It Works
 
-- Agents execute sequentially as defined in the [configuration](config/README.md)
-- Each agent can take input from pipeline input or other agents
-- Multi-input agents supported (agent can read from multiple sources)
-- All configuration via YAML files, no code changes needed
-- Logs go to `stderr` (JSON format), structured output to `stdout`
-- Exit codes: 0 = success, 1 = failure
+- Agents execute sequentially as defined in `config/pipeline.yaml`.
+- Each agent produces a **typed artifact** stored as a separate JSON file under `runs/<run_id>/artifacts/`.
+- Every artifact carries an **envelope** (identity, provenance, quality metadata, content hash) validated at write time.
+- **Per-role model profiles** in `config/agentic.yaml` control which LLM each role uses.
+- Operational logs go to `stderr` (JSON, content-free); structured output goes to `stdout`.
+- Exit codes: 0 = success, 1 = failure.
 
 ## Structure
 
-```bash
+```text
 spec2code-naive/
-├── main.py                    # CLI entry point
-├── test_runtime.py            # Regression tests
-├── test_config.py             # Config validation tool
-├── requirements.txt           # Python dependencies
-├── sample_input.txt           # Example input file
-├── logging_config.py          # Logging configuration
-├── exceptions.py              # Custom exceptions
-├── core/
-│   ├── agent.py               # Agent execution
-│   ├── orchestrator.py        # Pipeline orchestration
-│   └── run_manager.py         # Run storage and metadata
-├── config/
-│   ├── README.md                  # Configuration system documentation
-│   ├── pipeline.yaml              # Agent sequence and inputs
-│   ├── models/                    # LLM provider configs
-│   │   ├── openai_gpt4.yaml       # OpenAI configuration
-│   │   ├── anthropic_claude.yaml  # Anthropic configuration
-│   │   └── ollama_llama.yaml      # Ollama configuration
-│   └── agents/                    # Agent configs and prompts
-│       ├── plan_maker/
-│       │   ├── agent.yaml         # Agent metadata
-│       │   └── prompts.yaml       # Prompt templates
-│       ├── plan_critique_generator/
-│       │   ├── agent.yaml         # Agent metadata
-│       │   └── prompts.yaml       # Prompt templates
-│       └── plan_critique_comparator/
-│           ├── agent.yaml         # Agent metadata
-│           └── prompts.yaml       # Prompt templates
-├── config_system/
-│   ├── __init__.py              # Package initialization
-│   ├── config_loader.py         # Config loading and validation
-│   └── agent_factory.py         # Agent instantiation
-├── runs/                        # Run output storage
-│   ├── 20250801_151701_1884a7b5/     # Results of the run
-│   │   ├── result.json               # Pipeline output
-│   │   └── metadata.json             # Run metadata
-│   └── ...
-└── docs/                      # Documentation
-    ├── spec2code-naïve raw initial plan.md
-    ├── spec2code - a bit less naïve flow.pdf
-    └── spec2code - a bit less naïve flow.jpg
+  main.py                          # CLI entry point
+  test_artifacts.py                # Artifact system tests
+  test_collaboration.py            # Collaboration artifact tests
+  test_runtime.py                  # Pipeline regression tests
+  test_config.py                   # Config validation tool
+  requirements.txt                 # Python dependencies
+  sample_input.txt                 # Example input file
+  logging_config.py                # Logging configuration
+  exceptions.py                    # Custom exceptions
+  agentic/
+    artifacts/
+      models.py                    # Artifact envelope + 18 content models
+      registry.py                  # ArtifactType -> content model mapping
+      store.py                     # ArtifactStore (run dirs, read/write)
+      validation.py                # Envelope (hard gate) + content (soft gate)
+      schemas/                     # Generated JSON Schema files (19 files)
+    collaboration/
+      models.py                    # Collaboration event models
+      event_log.py                 # JSONL event log writer/reader
+      transcript_store.py          # Stakeholder transcript/content store
+      schemas/
+        CollaborationEvent.schema.json
+  core/
+    agent.py                       # Agent execution (LangChain)
+    orchestrator.py                # Pipeline orchestration + artifact wrapping
+    run_manager.py                 # Deprecated; kept for reference
+  config/
+    agentic.yaml                   # Role model profiles
+    pipeline.yaml                  # Agent sequence and inputs
+    models/                        # LLM provider configs
+      openai_gpt5.yaml
+      openai_gpt5_mini.yaml
+      openai_gpt5_nano.yaml
+    agents/                        # Agent configs and prompts
+      business_analyst/
+      ba_lead/
+      plan_maker/
+      plan_critique_generator/
+      plan_critique_comparator/
+  config_system/
+    config_loader.py               # Config loading, validation, agentic config
+    agent_factory.py               # Agent instantiation with model override
+  scripts/
+    export_schemas.py              # Generate JSON Schema files from models
+  runs/                            # Run output storage
+    <run_id>/
+      metadata.json                # Run metadata + artifacts manifest
+      artifacts/
+        BusinessRequirements.json  # Typed artifact with envelope
+  docs/
+    spec2code-naive raw initial plan.md
+```
+
+## Setup
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install langchain-openai  # or preferred provider
+export OPENAI_API_KEY="your-key"
 ```
 
 ## Usage
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-pip install langchain-openai  # or your preferred provider
-
-# Set API key
-export OPENAI_API_KEY="your-key" # or your preferred provider's key
-
 # Run pipeline
-python main.py -i sample_input.txt
-# python main.py --help for more options
+.venv/bin/python main.py -i sample_input.txt
 
-# Test configuration
-python test_config.py validate
-# python test_config.py --help for more options
+# Dry run (no LLM calls)
+.venv/bin/python main.py -i sample_input.txt --dry-run
 
-# Run regression tests
-python test_runtime.py
-
-# CI/CD pipeline
-python test_config.py validate && python test_runtime.py && python main.py -i input.txt
+# All options
+.venv/bin/python main.py --help
 ```
+
+## Testing
+
+```bash
+# Artifact system tests (models, store, validation, role profiles, integration)
+.venv/bin/python -m unittest test_artifacts.py
+
+# Collaboration artifact tests
+.venv/bin/python -m unittest test_collaboration.py
+
+# Pipeline regression tests
+.venv/bin/python test_runtime.py
+
+# Config validation
+.venv/bin/python test_config.py validate
+
+# Full regression gate
+.venv/bin/python -m unittest test_artifacts.py \
+  && .venv/bin/python -m unittest test_collaboration.py \
+  && .venv/bin/python test_runtime.py \
+  && .venv/bin/python test_config.py validate
+```
+
+## Regenerating JSON Schemas
+
+```bash
+.venv/bin/python scripts/export_schemas.py
+```
+
+Schemas are written to `agentic/artifacts/schemas/` and `agentic/collaboration/schemas/` and should be checked into the repo.
 
 ## Configuration
 
-See [config/README.md](config/README.md) for configuration details.
+See [config/README.md](config/README.md) for agent/model configuration details.
 
-## Run System & Output Artifacts
+### Role Model Profiles
 
-### Run System
+`config/agentic.yaml` maps each role to a model config:
 
-Execution flow:
-1. Input content is loaded from specified file(s)
-2. Configuration is validated from YAML files
-3. Agents execute sequentially as defined in `pipeline.yaml`
-4. Each agent processes inputs according to its configuration
-5. Results are structured into a unified JSON output
-6. Structured output is sent to `stdout`, logs to `stderr`
-7. Output artifacts are stored in run-specific directory
-
-### Run Folders Structure
-
-Each pipeline execution creates a dedicated run folder with unique ID:
-
-```bash
-runs/
-├── 20250801_174513_12345678/    # Format: timestamp_uuid
-│   ├── result.json              # Complete execution output
-│   └── metadata.json            # Run metadata
-└── 20250801_180042_87654321/
-    ├── result.json
-    └── metadata.json
+```yaml
+role_model_profiles:
+  business_analyst:
+    model: openai_gpt5
+  qa_engineer:
+    model: openai_gpt5_mini
 ```
 
-#### Metadata File
+The orchestrator resolves the model per role at runtime and records it in artifact provenance.
 
-Each run generates a `metadata.json` file containing:
+## Run System And Artifact Store
+
+### Run Folder Layout
+
+```text
+runs/<run_id>/
+  metadata.json
+  artifacts/
+    BusinessRequirements.json
+    ...
+  collaboration/
+    collaboration_events.jsonl
+    stakeholder_transcript.txt
+```
+
+### Metadata File
 
 ```json
 {
-  "run_id": "20250801_174513_12345678",
-  "timestamp": "2025-08-01T17:45:13.123456",  // Recorded at completion time
-  "config_root": "/absolute/path/to/config",
-  "input_file": "/absolute/path/to/sample_input.txt",
-  "pipeline_name": "spec2code_pipeline",
+  "run_id": "20260220_093000_abc12345",
+  "timestamp": "2026-02-20T09:30:00.000000+00:00",
+  "pipeline_name": "requirements_generator_pipeline",
   "execution_successful": true,
-  "agent_count": 3,
-  "total_execution_time": 10.5
-}
-```
-
-This provides a complete record of the run context, including input file and execution statistics.
-
-### Output Artifacts
-
-The pipeline produces a structured JSON output with the following components:
-
-```json
-{
-  "pipeline_name": "spec2code_pipeline",
-  "execution_successful": true,
-  "pipeline_input": {
-    "content": "...",  // Original input content!
-    "source": "input.txt",
-    "size": 1322
-  },
-  "agents": {
-    "agent_name": {
-      "output": { 
-        "agent_response": "..."
-      },
-      "messages": [  // Optional: only when include_messages_in_artifacts: true
-        {
-          "type": "system",
-          "content": "You are a business analyst..."
-        },
-        {
-          "type": "human", 
-          "content": "Please analyze the following requirements..."
-        },
-        {
-          "type": "ai",
-          "content": "I'll help you analyze..."
-        }
-      ],
-      "metadata": {
-        "execution_time": 0.0,
-        "prompt_templates_used": ["template_name"],
-        "prompt_templates_count": 1,
-        "input_sources": "pipeline_input"  // or ["agent1", "agent2"]
-      }
+  "total_execution_time": 10.5,
+  "artifacts_manifest": [
+    {
+      "artifact_type": "BusinessRequirements",
+      "file": "artifacts/BusinessRequirements.json",
+      "content_hash": "sha256:abcdef..."
     }
-  },
-  "metadata": {
-    "agent_sequence": ["agent1", "agent2"],
-    "execution_time": 0.0
-  }
+  ]
 }
 ```
+
+### Artifact Envelope
+
+Every artifact JSON follows this structure:
+
+```json
+{
+  "identity": {
+    "artifact_id": "BusinessRequirements",
+    "artifact_type": "BusinessRequirements",
+    "schema_version": "1.0.0"
+  },
+  "provenance": {
+    "run_id": "...",
+    "created_at": "2026-02-20T09:30:01.000000+00:00",
+    "created_by_role": "business_analyst",
+    "created_by_agent_instance_id": "uuid",
+    "model_config_ref": { "provider": "OpenAI", "model_name": "gpt-5" },
+    "role_model_profile_id": "business_analyst",
+    "prompt_ref": { "template_name": "...", "template_version": "..." }
+  },
+  "content": { ... },
+  "quality_metadata": {
+    "assumptions": [],
+    "open_questions": [],
+    "risks": [],
+    "acceptance_criteria": []
+  },
+  "content_hash": "sha256:..."
+}
+```
+
+Envelope validation is a hard gate; content validation is warning-level during early milestones.
+
+### Collaboration Artifacts
+
+Milestone 2 introduces run-scoped collaboration artifacts:
+
+- `collaboration_events.jsonl`: append-only event stream (`orchestrator_decision_made`, `artifact_produced`, and future stakeholder events).
+- `stakeholder_transcript.txt`: plain-file transcript storage for Product Owner and stakeholder interaction content.
+- Events store references and hashes; operational logs remain content-free.
+
+## Architecture And Refactoring Plan
+
+See [agentic_refactoring_plan.md](agentic_refactoring_plan.md) for the full agentic architecture blueprint and milestone roadmap.

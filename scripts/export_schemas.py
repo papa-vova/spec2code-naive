@@ -13,6 +13,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from agentic.artifacts.models import Artifact
 from agentic.artifacts.registry import ARTIFACT_CONTENT_MODELS
+from agentic.collaboration.models import CollaborationEvent
 
 
 def main() -> int:
@@ -27,6 +28,12 @@ def main() -> int:
         schema_path = target_dir / f"{artifact_type.value}.schema.json"
         with open(schema_path, "w", encoding="utf-8") as file_obj:
             json.dump(model_cls.model_json_schema(), file_obj, indent=2, ensure_ascii=False)
+
+    collaboration_target_dir = Path("agentic/collaboration/schemas")
+    collaboration_target_dir.mkdir(parents=True, exist_ok=True)
+    collaboration_schema_path = collaboration_target_dir / "CollaborationEvent.schema.json"
+    with open(collaboration_schema_path, "w", encoding="utf-8") as file_obj:
+        json.dump(CollaborationEvent.model_json_schema(), file_obj, indent=2, ensure_ascii=False)
 
     return 0
 

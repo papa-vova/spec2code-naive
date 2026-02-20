@@ -45,7 +45,12 @@ class ArtifactStore:
             return None
         run_dir = self.get_run_directory(run_id)
         (run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
+        (run_dir / "collaboration").mkdir(parents=True, exist_ok=True)
         return run_dir
+
+    def get_collaboration_dir(self, run_id: str) -> Path:
+        """Return run collaboration directory path for run ID."""
+        return self.get_run_directory(run_id) / "collaboration"
 
     def write_artifact(self, run_id: str, artifact: Artifact) -> Optional[Path]:
         """Persist artifact JSON under run artifacts folder."""

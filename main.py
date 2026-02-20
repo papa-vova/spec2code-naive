@@ -9,6 +9,7 @@ from typing import Dict, Any
 from agentic.artifacts.models import ArtifactType
 from agentic.artifacts.store import ArtifactStore
 from agentic.artifacts.validation import validate_content, validate_envelope
+from agentic.collaboration.event_log import CollaborationEventLog
 from core.orchestrator import Orchestrator
 from config_system.config_loader import ConfigLoader
 from exceptions import PipelineError, InputError, FileNotFoundError, EmptyFileError
@@ -57,6 +58,12 @@ class Pipeline:
         """
         # Generate unique run ID
         run_id = self.artifact_store.generate_run_id()
+        run_dir = self.artifact_store.initialize_run(run_id)
+        collaboration_event_log = (
+            CollaborationEventLog(self.artifact_store.get_collaboration_dir(run_id))
+            if run_dir is not None
+            else None
+        )
         
         # Prepare input data for orchestrator with proper structure
         input_data = {
@@ -70,6 +77,7 @@ class Pipeline:
             input_data=input_data,
             run_id=run_id,
             artifact_store=self.artifact_store,
+            collaboration_event_log=collaboration_event_log,
         )
         
         # Add run ID to result
